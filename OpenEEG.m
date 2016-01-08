@@ -5,12 +5,12 @@ output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/signals/';
 second_output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/events/';
 files = dir(path);
 %Find all the files with .set type FROM THE FIRST ROUND (before training)
-index = find(~cellfun(@isempty,strfind({files.name},'1_TD.set')));
+index = find(~cellfun(@isempty,strfind({files.name},'2_TD.set')));
 files = {files.name};
 %Sort them alphabetically
 files = sort(files(index));
 all_events = {}
-for i = 1:1%length(files)
+for i = 1:length(files)
     files{i}
     EEG = pop_loadset('filename',files{i},'filepath',path);
     sum(sum(double(EEG.data)));
@@ -21,13 +21,13 @@ for i = 1:1%length(files)
 
     %pop_prop(slices , 1, 5, NaN, {'freqrange' [2 70] });
 
-    %name = strcat(output,files{i}(1:end-4),'.mat');
-    %eegToSave = EEG.data;
-    %save(name,'eegToSave')
-    %save(strcat(second_output, files{i}(1:end-4),'_EVENTS'),'-struct', 'EEG', 'event' );
-    %save(strcat(second_output, files{i}(1:end-4),'_UREVENTS'), '-struct', 'EEG', 'urevent');
-    %save(strcat(second_output, files{i}(1:end-4),'_CONDITION'),'-struct', 'EEG','condition', 'session', 'group', 'ref');
-    %save(strcat(second_output, files{i}(1:end-4),'_ELECTRODES'),'-struct', 'EEG','chanlocs');
+    name = strcat(output,files{i}(1:end-4),'.mat');
+    eegToSave = EEG.data;
+    save(name,'eegToSave')
+    save(strcat(second_output, files{i}(1:end-4),'_EVENTS'),'-struct', 'EEG', 'event' );
+    save(strcat(second_output, files{i}(1:end-4),'_UREVENTS'), '-struct', 'EEG', 'urevent');
+    save(strcat(second_output, files{i}(1:end-4),'_CONDITION'),'-struct', 'EEG','condition', 'session', 'group', 'ref');
+    save(strcat(second_output, files{i}(1:end-4),'_ELECTRODES'),'-struct', 'EEG','chanlocs');
 end
 
 
