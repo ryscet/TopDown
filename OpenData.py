@@ -13,7 +13,6 @@ and also organize the events, into full trials in different conditions.
 After HDF was made data load quickly, so no separate openinig script is needed.
 
 """
-#TODO Change to globals the vars differing before and after
 
 #########
 import glob
@@ -265,15 +264,4 @@ def LoadChannels(subID):
     return chanlocs
 
         #[#x[0][0][0]for x in mat_struct]
-        #[x[0][0][0]for x in tmp]
-    #Unpack the event times
-     #   latency = np.array(mat_struct[0,:]['latency']).astype('float')
-    #Unpack the event names
-      #  stype = np.array([name[0][:] for name in mat_struct[0,:]['type']], dtype = object)
-       # names = ['latency', 'type']
-    #Create the pandas dataframe to store the data
-        #database = pd.DataFrame(data = [latency,stype]).T
-        #database.columns = names
-        #allEvents.append(database.replace({"type": mergedDict}))
-
 
