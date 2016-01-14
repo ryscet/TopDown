@@ -26,7 +26,7 @@ badChannels = ['LEar', 'REar', 'Iz', 'A1', 'A2', 'AFz', 'FT9', 'FT10', 'FCz']
 #########
 
 #define he windows around events here
-windows_selected = {'Target_back': 1000, 'Target_forth' :125, 'Cue_back':50, 'Cue_forth': 1000 }
+windows_selected = {'Target_back': 1000, 'Target_forth' :0, 'Cue_back':-100, 'Cue_forth': 1000 }
 
 def CollectAllNumpy():
     shortName = {'td_before_database.hdf5': 'before', 'td_after_database.hdf5': 'after'}
