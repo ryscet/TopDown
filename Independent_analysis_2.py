@@ -17,7 +17,7 @@ This script analyses before and after training results, and looks for training e
 from scipy.signal import welch as my_welch
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
+#from matplotlib import gridspec
 from scipy.stats import ttest_ind as t_test
 import os
 import pickle
@@ -52,7 +52,7 @@ def loadNumpy():
 
 def CollectAllSubsWelch(conditions, database_idx):
     all_results = []
-    short_db = ['Cue', 'Target', 'Cue', 'Target']
+    short_db = ['Cue Before', 'Target Before', 'Cue After', 'Target After']
 
     database = pickle.load( open(all_saved_epochs[database_idx], "rb" ))
 

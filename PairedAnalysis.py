@@ -10,7 +10,7 @@ This script analyses before and after training results, and looks for training e
 from scipy.signal import welch as my_welch
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
+#from matplotlib import gridspec
 from scipy.stats import ttest_ind as t_test
 import os
 import pickle

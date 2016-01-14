@@ -8,8 +8,8 @@ from pandas import HDFStore
 import scipy.io as sio
 import glob
 import pickle
+import numpy as np
 
-#TODO change the way window times are determined in time slices to be recognized from a string event_type (make a dict)
 
 CURRENT_DATABASE ='td_before_database.hdf5'
 bef_aft_switch = 'before'
@@ -34,16 +34,24 @@ def CollectAllNumpy():
 
     for _d_base in ['td_before_database.hdf5', 'td_after_database.hdf5']:
         CURRENT_DATABASE = _d_base
-        MakeDataAndKeys(CURRENT_DATABASE)
+        database, keys = MakeDataAndKeys(CURRENT_DATABASE)
+        print(_d_base)
         for _w_type in ['Target', 'Cue']:
-            all_subs = []
-            for i in range(0,46):
-                all_subs.append(CreateNumpyDicts(i, _w_type))
-            #Save to a file
+            print(_w_type)
+            all_subs = {}
+            #Iterate through all keys, i.e. folders in the HDF database, and select only those that contain timestamps of events (only other folders contain the signal itself)
+            gen = (condition for condition in keys.keys() if 'signal' not in condition)
+
+            for condition in gen:
+                #Iterate through all subjects
+                for i in range(0,46):
+                    print(i)
+                    all_subs[condition] = (CreateNumpyDicts(i, _w_type, condition, database, keys))
+                #Save to a file
             path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + shortName[CURRENT_DATABASE] + '_'+ _w_type+ '.p'
             pickle.dump(all_subs, open(path, "wb" ) )
 
-def CreateNumpyDicts(subID, window_type):
+def CreateNumpyDicts(subId, window_type, condition, _database, _keys):
     global SANITY_DICT
 
     sanityDict = {
@@ -54,56 +62,29 @@ def CreateNumpyDicts(subID, window_type):
     }
     SANITY_DICT = sanityDict
 
-    channel_names, good_indexes = LoadChannels(subID)
-
-    allEpochs = {}
+    channel_names, good_indexes = LoadChannels(subId)
     #Transpose because HDF stores data in rows but MNE in columns
-
-    for key in keys.keys():
-    #But still it will cut out slices from signal here based on events data
-        if key != 'signal':
-            type_epochs = SelectSlices(event_type = key, time_type = window_type, subId = subID, _good_channels = good_indexes)
-           # type_epochs = SelectSlices(event_type = key, time_type = window_type, subId = subID, win_size = 50, forward_window = 1000, _good_channels = good_indexes)
-            print(key + ' '+  str(len(type_epochs)))
-            allEpochs[key] = type_epochs
-    return allEpochs
+#TODO make sure the transpose did not fuck things up
+    subject_condition_epochs = SelectSlices(condition, window_type, good_indexes, signal = _database[_keys['signal'][subId]], events = _database[_keys[condition][subId]])
+    print(condition + ' '+  str(len(subject_condition_epochs)))
+    return subject_condition_epochs
 
 
 
 
 #--------------FUNCTIONS TO CREATE MNE EPOCHS---------------
 
-def LoadChannels(subID):
-    """Load the data saved in matlab format, extracted before with matlab from eeg struct (the event field) of eeglab
-    Chanlocs are actually chan names, but most eeg software can infare the location from standard naming"""
-    mat_events = [name for name in events_names if '1_TD_ELECTRODES' in name]
-    mat_struct = sio.loadmat(mat_events[subID])
-    n_channels = len(mat_struct['chanlocs'][0,:])
-    chanlocs = [mat_struct['chanlocs'][0,i][0][0] for i in range(0,n_channels)]
-    #First make a list with all indexes
-    good_chan_idx = [i for i in range(len(chanlocs))]
-    #Determine which ones are bad (i.e. do not appear in both caps, but defined manually by a list)
-    bad_chan_idx = [idx for idx, item in enumerate(chanlocs) if item in badChannels]
-    chanlocs = [chan for chan in chanlocs if chan not in badChannels]
-    #Delete their indexes to be used in select slices later
-    for index in sorted(bad_chan_idx , reverse=True):
-        del good_chan_idx[index]
-
-    return chanlocs, good_chan_idx
 
 
-
-def SelectSlices(event_type = 'att_corr', time_type = 'Target', subId = 0, _good_channels = None):
+#Put here by default values that would raise an error if not overwritten by func passed parameters. Bad way of looking for bugs, change to not-predeifned parameters.
+def SelectSlices(event_type, time_type , _good_channels, signal, events):
+    """
+    It makes a cube depth(epochs) * height(channels) * width (n_samples). Cube contains trials (i.e. epochs) of type defined by event type (att corr itp) and around event defined by time type, for example Target
+    Will return [1,1,1] np.array if demanded events were not found (for example subject made no errors)
+    """
     win_size = windows_selected[time_type + '_back']
     forward_window = windows_selected[time_type + '_forth']
-    ''' Selects slice from datastructures created by MakeDataAndDict()
-        Will return [1,1] np.array if demanded events were not found (for example subject made no errors) '''
-#Maybe optimize, takes a lot of time, although not in a loop (executed once for every subject. 150 ms * 50 = ~ 8 sec )
-    signal = database[ keys['signal'][subId]]
-    events = database[ keys[event_type][subId]]
-    print('subId: ' + str(subId))
-#TODO maybe instead of a completely empty df, make one with correct column names but empty rows,
-#Question is which approach is better
+
     global WIN_SIZE
     WIN_SIZE = win_size
     global FORWARD_WINDOW
@@ -123,6 +104,26 @@ def SelectSlices(event_type = 'att_corr', time_type = 'Target', subId = 0, _good
             except:
                 pass
     return arr_of_slices
+
+
+
+def LoadChannels(subID):
+    """Load the data saved in matlab format, extracted before with matlab from eeg struct (the event field) of eeglab
+    Chanlocs are actually chan names, but most eeg software can infare the location from standard naming"""
+    mat_events = [name for name in events_names if '1_TD_ELECTRODES' in name]
+    mat_struct = sio.loadmat(mat_events[subID])
+    n_channels = len(mat_struct['chanlocs'][0,:])
+    chanlocs = [mat_struct['chanlocs'][0,i][0][0] for i in range(0,n_channels)]
+    #First make a list with all indexes
+    good_chan_idx = [i for i in range(len(chanlocs))]
+    #Determine which ones are bad (i.e. do not appear in both caps, but defined manually by a list)
+    bad_chan_idx = [idx for idx, item in enumerate(chanlocs) if item in badChannels]
+    chanlocs = [chan for chan in chanlocs if chan not in badChannels]
+    #Delete their indexes to be used in select slices later
+    for index in sorted(bad_chan_idx , reverse=True):
+        del good_chan_idx[index]
+
+    return chanlocs, good_chan_idx
 
 def CollectAllSubjectEpochs(window_type):
     """Gathers all the individual 'cubes', trials * electrodes * n_samples and appends them in a massive cube containing all trials, without differentiating per subject.
@@ -243,12 +244,8 @@ def MakeDataAndKeys(_current_databse):
     Database is a all data in HDF format (signals and organized results). Will be loaded into df.
     Keys is a result of dividing all the strings, which are apaths to the HDF database into conditions'''
 #Added none because I think sometimes when keys were loaded, loading them again with a new databse was appending instead of substituting, which produced errors downstream
-    global database
-    database = None
     database = OpenDatabase(_current_databse)
 
-    global keys
-    Keys = None
     keys = database.keys()
 
     signal_keys = sorted([key for key in keys if 'signal/filtered' in key])
