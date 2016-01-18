@@ -24,10 +24,10 @@ import pickle
 
 
 #List of epochs types that were already saved(thus there is no need to compute them)
-all_saved_epochs = ['/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/before_Cue.p',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/before_Target.p',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/after_Cue.p',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/after_Target.p']
+all_saved_epochs = ['/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/before/Cue/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/before/Target/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/after/Cue/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/after/Target/']
 try:
     ch_names
 except:
@@ -43,29 +43,154 @@ def Run():
         for database_idx in range(0,4):
             CollectAllSubsWelch(condition, database_idx)
 
-def loadNumpy():
-    database = []
-    for database_idx in range(0,4):
-        database.append(pickle.load( open(all_saved_epochs[database_idx], "rb" )))
+
+def loadAllNumpy():
+    database = {}
+    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/'
+    for training in ['before', 'after']:
+        database[training] = {}
+        for event in ['Cue', 'Target']:
+            database[training][event] = {}
+            for condition in ['att_corr', 'mot_corr', 'att_miss', 'mot_miss']:
+                database[training][event][condition] = pickle.load( open(path + training +'/' + event +'/' + condition + '.p', "rb" ) )
     return database
 
+def loadSingleNumpy(training, event, condition):
+     path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + training + '/' + event + '/' + condition +'.p'
+     return pickle.load( open(path, "rb" ) )
 
-def CollectAllSubsWelch(conditions, database_idx):
+
+
+def CompareConditions():
+    results = {}
+    training = 'before'
+    event = 'Target'
+    for condition in ['att_corr', 'mot_corr']:
+        results[condition] = ReverseSubjectElectrodeNesting(CollectAllSubsWelch(training, event, condition))
+
+    Plot_electrode_welch(results, training, event, ['att_corr', 'mot_corr'])
+
+    #Plot_electrode_welch(results, training, event, ['att_corr', 'mot_corr'])
+    return results
+
+def ReverseSubjectElectrodeNesting(list_of_subjects):
+    dict_of_electrodes = {name : [] for name in ch_names}
+    for subject in list_of_subjects:
+        for electrode_ffts, electrode_name in zip(subject, ch_names):
+#IMPORTANT: Any normalization would be easiest to implement here as 'tis were the rows are enumerated
+            dict_of_electrodes[electrode_name].append(electrode_ffts)
+
+    for key, item in dict_of_electrodes.items():
+
+        dict_of_electrodes[key] = np.array(item)
+    return dict_of_electrodes
+
+def CollectAllSubsWelch(training, event, condition):
     all_results = []
-    short_db = ['Cue Before', 'Target Before', 'Cue After', 'Target After']
+    valid_trials_threshold = 5
+    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + training + '/' + event + '/'
 
-    database = pickle.load( open(all_saved_epochs[database_idx], "rb" ))
+    results = pickle.load( open(path + condition +'.p', "rb" ))
+    #Exclude subjectsthat had very few valid trials
+    results = [subject for subject in results if len(subject) >= valid_trials_threshold]
 
-    for i in range(0,46):
-        print(i)
-        subject_results = Compute_all_welch(database[i][conditions[0]], database[i][conditions[1]])
-        all_results.append(subject_results)
+    for subject in results:
+        #Collect a list of all electrodes average fft in a given condition * subjects
+        all_results.append(Compute_all_welch_single_condition(subject))
 
-    Plot_electrode_welch(all_results,short_db[database_idx], conditions)
-#    return all_subs
+    #Plot_electrode_welch(all_results, training, condition, event)
+    return all_results
+
+def Compute_all_welch_single_condition(subject):
+    """Returns a list of average fft for all electrodes in a given condition for a single subject"""
+    all_electrodes = []
+    for electrode in range (0,59):
+        #Here we select all trials for a single electrode and reshape the so the depth dimension is n_trial, there is no vertical dimension (it used to be n_electrodes), and horizontal dimension is the signal, i.e. n_samples
+        single_electrode = subject[:,electrode,:].reshape(len(subject[:,0,0]),1,len(subject[0,0,:]))
+        all_electrodes.append(Compute_electrode_welch(single_electrode))
+
+    return all_electrodes
 
 
-def Compute_all_welch(subject_con_a, subject_con_b):
+def Compute_electrode_welch(single_electrode):
+    """
+    Take the average from a single electrode from all trials. Changed from independent analysis version where
+    the average was taken only before plotting in a downstream function Plot_electrode_welch
+    """
+    all_psd = []
+    global FREQS
+    for epoch in single_electrode:
+        freqs, power = my_welch(epoch, fs  = 500, nperseg =256, nfft = 256, noverlap = 128)
+        #power[0,:], changes a shape so then the np.array easilly converts it so that each row is a single trial fft
+        all_psd.append(power[0,:])
+
+    all_psd = np.array(all_psd)
+    FREQS = freqs[3:36]
+    return np.mean(all_psd, axis = 0)[3:36]
+
+
+
+def Plot_electrode_welch(all_results, training, event_type, conditions):
+    """Takes for an input a dictionary which has two fields, electrodes_a and b. event_type is a string. condition is a list of strings describing what comparison is made"""
+    plt.close('all')
+
+    for (name_a, electrode_a), (name_b, electrode_b) in zip(all_results[conditions[0]].items(), all_results[conditions[1]].items()):
+        fig = plt.figure()
+        fig.suptitle(name_a + ' ' + name_b+ '\n'+  conditions[0] + ' vs ' + conditions[0] + '\n' + event_type, fontweight = 'bold')
+        a_b_conditions = fig.add_subplot(111)
+#Iterate in two seperate loops since they might (and in fact are for sure) of unequal lengths
+        for trial_a in electrode_a:
+            a_b_conditions.plot(FREQS, np.log10(trial_a), color = 'green', alpha = 0.1)
+
+        for trial_b in electrode_b:
+            a_b_conditions.plot(FREQS, np.log10(trial_b), color = 'red', alpha = 0.1)
+
+        try:
+            a_b_conditions.plot(FREQS, np.log10(electrode_a.mean(axis = 0)),label = conditions[0], linewidth=2, color = 'green')
+            a_b_conditions.plot(FREQS, np.log10(electrode_b.mean(axis = 0)),label = conditions[1], linewidth=2, color = 'red')
+
+            a_b_conditions.set_xlim(min(FREQS), max(FREQS))
+            a_b_conditions.set_xlabel('Frequency')
+            a_b_conditions.set_ylabel('Welch power spectrum')
+
+            p_vals = []
+            for frequency in range(0, len(FREQS)):
+                t,p = t_test(electrode_a[:, frequency], electrode_b[:, frequency])
+                p_vals.append(p)
+
+            sigs = [idx for idx,p_val in enumerate(p_vals) if p_val < 0.005]
+
+            #save in all
+            for sig in sigs:
+                #sig times two because the index is half the actuall frequency
+                a_b_conditions.vlines(x = sig*2, ymin = -2.5, ymax = 1.5, color = 'blue', linestyle = '--', label = 'alpha 0.005', alpha = 0.2)
+             #   test.hlines(y = 0.005, xmin =FREQS[3], xmax = FREQS[36],  color = 'red', linestyle = '--', label = 'alpha 0.005')
+
+            a_b_conditions.legend(loc = 'best')
+
+            path_conditions = conditions[0] + '_' + conditions[1]
+            directory = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions + '/All/'
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+            plt.savefig('/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions+ '/All/'+ name_a + '.png')
+
+
+
+            #Save also in sigs
+
+            if sigs != []:
+                directory_sig = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions+ '/Sig/'
+                if not os.path.exists(directory_sig):
+                    os.makedirs(directory_sig)
+                plt.savefig('/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions + '/Sig/'+ name_a + '.png')
+        except:
+           # print(a_avg)
+            #print(b_avg)
+            print('Probably not enouth trials')
+
+
+def Compute_all_welch_two_conditions(subject_con_a, subject_con_b):
     """The first complete analysis, power spectrum in the determined window using welch method. Two average power spectra are compared using independent t-test"""
 
     all_a= []
@@ -86,92 +211,4 @@ def Compute_all_welch(subject_con_a, subject_con_b):
     return {'electrodes_a': all_a, 'electrodes_b':all_b}
   #  except:
   #      print('-----------NO EVENTS OF TYPE FOUND-----------: ' + comparison_type + ' ' + condition )
-def Compute_electrode_welch(single_electrode):
-    """
-    Take the average from a single electrode from all trials. Changed from independent analysis version where
-    the average was taken only before plotting in a downstream function Plot_electrode_welch
-    """
-    all_psd = []
-    global FREQS
-    for epoch in single_electrode:
-        freqs, power = my_welch(epoch, fs  = 500, nperseg =256, nfft = 256, noverlap = 128)
-        #why is it [0,:]?, to change the shape?
-        all_psd.append(power[0,:])
 
-    all_psd = np.array(all_psd)
-    FREQS = freqs[3:36]
-    return np.mean(all_psd, axis = 0)[3:36]
-
-
-
-def Plot_electrode_welch(_all_results, event_type, condition):
-    plt.close('all')
-    #event type, i.e. databse, CUe or Target, conditon, for example 'attention correct
-
-#This loop is to reverse the nesting from subject * electrodes to the other way
-    all_electrodes_a_and_b = {name : [] for name in ch_names}
-    for subject in _all_results:
-        #a and b refer to conditions, for example att_corr and mot_corr
-        for a_electrode, b_electrode, electrode_name in zip(subject['electrodes_a'], subject['electrodes_b'], ch_names):
-           all_electrodes_a_and_b[electrode_name].append({condition[0] : a_electrode,  condition[1] : b_electrode})
-
-    for key, electrode in all_electrodes_a_and_b.items():
-        fig = plt.figure()
-        fig.suptitle(key, fontweight = 'bold')
-        a_b_conditions = plt.subplot()
-        a_avg, b_avg = [],[]
-
-        for idx, subject_avg in enumerate(electrode):
-            a_b_conditions.plot(FREQS, np.log10(subject_avg[condition[0]]), color = 'red', alpha = 0.1)
-            a_b_conditions.plot(FREQS, np.log10(subject_avg[condition[1]]), color = 'green', alpha = 0.1)
-            a_avg.append(subject_avg[condition[0]])
-            b_avg.append(subject_avg[condition[1]])
-
-        a_avg = np.array(a_avg)
-        b_avg = np.array(b_avg)
-
-        try:
-            a_b_conditions.plot(FREQS, np.log10(a_avg.mean(axis = 0)),label = condition[0], linewidth=2, color = 'green', )
-            a_b_conditions.plot(FREQS, np.log10(b_avg.mean(axis = 0)),label = condition[1], linewidth=2, color = 'red')
-
-            a_b_conditions.set_xlim(min(FREQS), max(FREQS))
-            a_b_conditions.set_xlabel('Frequency')
-            a_b_conditions.set_ylabel('Welch power spectrum')
-
-
-
-            p_vals = []
-            for frequency in range(0, len(FREQS)):
-                t,p = t_test(a_avg[:, frequency], b_avg[:, frequency])
-                p_vals.append(p)
-
-            sigs = [idx for idx,p_val in enumerate(p_vals) if p_val < 0.005]
-
-            #save in all
-            for sig in sigs:
-                #sig times two because the index is half the actuall frequency
-                a_b_conditions.vlines(x = sig*2, ymin = -2.5, ymax = 1.5, color = 'blue', linestyle = '--', label = 'alpha 0.005', alpha = 0.2)
-             #   test.hlines(y = 0.005, xmin =FREQS[3], xmax = FREQS[36],  color = 'red', linestyle = '--', label = 'alpha 0.005')
-
-            a_b_conditions.legend(loc = 'best')
-
-            path_conditions = condition[0] + '_' + condition[1]
-            directory = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions + '/All/'
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
-            plt.savefig('/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions+ '/All/'+ key + '.png')
-
-
-
-            #Save also in sigs
-
-            if sigs != []:
-                directory_sig = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions+ '/Sig/'
-                if not os.path.exists(directory_sig):
-                    os.makedirs(directory_sig)
-                plt.savefig('/Users/ryszardcetnarski/Desktop/Nencki/TD/Figs/Independent/'+ event_type +'/' + path_conditions + '/Sig/'+ key + '.png')
-        except:
-            print(a_avg)
-            print(b_avg)
-            print('Probably not enouth trials')

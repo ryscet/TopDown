@@ -9,6 +9,7 @@ import scipy.io as sio
 import glob
 import pickle
 import numpy as np
+import os
 
 
 CURRENT_DATABASE ='td_before_database.hdf5'
@@ -23,51 +24,67 @@ events_names = glob.glob(events_path +'*')
 
 badChannels = ['LEar', 'REar', 'Iz', 'A1', 'A2', 'AFz', 'FT9', 'FT10', 'FCz']
 
-#########
 
 #define he windows around events here
 windows_selected = {'Target_back': 1000, 'Target_forth' :0, 'Cue_back':-100, 'Cue_forth': 1000 }
 
-def CollectAllNumpy():
-    shortName = {'td_before_database.hdf5': 'before', 'td_after_database.hdf5': 'after'}
 
 
-    for _d_base in ['td_before_database.hdf5', 'td_after_database.hdf5']:
-        CURRENT_DATABASE = _d_base
-        database, keys = MakeDataAndKeys(CURRENT_DATABASE)
-        print(_d_base)
-        for _w_type in ['Target', 'Cue']:
-            print(_w_type)
-            all_subs = {}
-            #Iterate through all keys, i.e. folders in the HDF database, and select only those that contain timestamps of events (only other folders contain the signal itself)
-            gen = (condition for condition in keys.keys() if 'signal' not in condition)
-
-            for condition in gen:
-                #Iterate through all subjects
-                for i in range(0,46):
-                    print(i)
-                    all_subs[condition] = (CreateNumpyDicts(i, _w_type, condition, database, keys))
-                #Save to a file
-            path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + shortName[CURRENT_DATABASE] + '_'+ _w_type+ '.p'
-            pickle.dump(all_subs, open(path, "wb" ) )
-
-def CreateNumpyDicts(subId, window_type, condition, _database, _keys):
-    global SANITY_DICT
-
-    sanityDict = {
+#Used to create MNE epochs code
+sanityDict = {
     'mot_miss' : 0,
     'att_corr' : 1,
     'mot_corr' : 2,
     'att_miss' : 3
     }
-    SANITY_DICT = sanityDict
+#########
 
-    channel_names, good_indexes = LoadChannels(subId)
-    #Transpose because HDF stores data in rows but MNE in columns
-#TODO make sure the transpose did not fuck things up
-    subject_condition_epochs = SelectSlices(condition, window_type, good_indexes, signal = _database[_keys['signal'][subId]], events = _database[_keys[condition][subId]])
-    print(condition + ' '+  str(len(subject_condition_epochs)))
-    return subject_condition_epochs
+def CollectAllNumpy():
+    shortName = {'td_before_database.hdf5': 'before', 'td_after_database.hdf5': 'after'}
+
+    all_data = {}
+    #Iterate through before and after results
+    for _d_base in ['td_before_database.hdf5', 'td_after_database.hdf5']:
+        CURRENT_DATABASE = _d_base
+        database, keys = MakeDataAndKeys(CURRENT_DATABASE)
+        print(_d_base)
+        #Iterate thorugh different types of stimuli on screen
+        all_stim = {}
+        for _w_type in ['Target', 'Cue']:
+            print(_w_type)
+            #Iterate through all keys, i.e. folders in the HDF database, and select only those that contain timestamps of events (only other folders contain the signal itself)
+            gen = (condition for condition in keys.keys() if 'signal' not in condition)
+            #iterate through different conditions, like attention correct, motor incorrect ets
+            all_conditions = {}
+            for condition in gen:
+                #Iterate through all subjects
+                print(condition)
+                all_subs = []
+                for subId in range(0,46):
+                    print(subId)
+                    #Need to load channels for every subject unfortunately, because they have different caps
+                    channel_names, good_indexes = LoadChannels(subId)
+                    all_subs.append(SelectSlices(condition, _w_type, good_indexes, database[keys['signal'][subId]], database[keys[condition][subId]]))
+                # Collect the repsonses for all subjects in a given event in a given condition and save  them to the file
+                all_conditions[condition] = all_subs
+                path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+
+                if not os.path.exists(path):
+                    os.makedirs(path)
+
+                with open(path  + condition +'.p', "wb") as output:
+                    pickle.dump(all_subs, output)
+
+            all_stim[_w_type] = all_conditions
+        all_data[_d_base] = all_stim
+    path_alldata = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/'
+    if not os.path.exists(path_alldata):
+        os.makedirs(path_alldata)
+    with open(path_alldata + 'AllData.p', "wb") as output:
+        pickle.dump(all_data, output)
+
+    return all_data
+
 
 
 
@@ -92,17 +109,19 @@ def SelectSlices(event_type, time_type , _good_channels, signal, events):
 
     arr_of_slices = np.zeros([1,1,1])
 
-    if(events.empty == False):
+#    if(events.empty == False):
+#Try because there might have been events codes that never actually occur, like mot miss, or some events were all cut out in eeglab boundaries from a person because of signal noise
+    try:
 #First dim (0) is the amount of slices/epochs, second is the number of electrodes and third is the n_samples. It makes a cube depth(epochs) * height(channels) * width (n_samples)
         arr_of_slices = np.zeros( [len(events[time_type]), len(_good_channels), win_size + forward_window]).astype('float64')
 
-
         for idx, time in enumerate(events[time_type]):
-            try:
-                #Need to transpose because HDF stores electrodes in columns, but MNE in rows
-                arr_of_slices[idx,:,:] = signal.iloc[int(time - win_size) : int(time) + forward_window, _good_channels].transpose()
-            except:
-                pass
+            #Need to transpose because HDF stores electrodes in columns, but MNE in rows
+            arr_of_slices[idx,:,:] = signal.iloc[int(time - win_size) : int(time) + forward_window, _good_channels].transpose()
+    except:
+        print("no events were found for: " + event_type)
+        pass
+
     return arr_of_slices
 
 
@@ -260,6 +279,9 @@ def MakeDataAndKeys(_current_databse):
     'att_miss' : att_miss_keys, 'mot_miss' : mot_miss_keys}
 
     return database, keys
+
+#Select good channels and only those overlapping between the two electrode types
+
 
 #try:
 #    keys
