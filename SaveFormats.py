@@ -9,9 +9,9 @@ import scipy.io as sio
 import glob
 import pickle
 import numpy as np
-import os
-
-
+import os, sys
+import pandas as pd
+import traceback
 CURRENT_DATABASE ='td_before_database.hdf5'
 bef_aft_switch = 'before'
 
@@ -42,14 +42,12 @@ sanityDict = {
 def CollectAllNumpy():
     shortName = {'td_before_database.hdf5': 'before', 'td_after_database.hdf5': 'after'}
 
-    all_data = {}
     #Iterate through before and after results
     for _d_base in ['td_before_database.hdf5', 'td_after_database.hdf5']:
         CURRENT_DATABASE = _d_base
         database, keys = MakeDataAndKeys(CURRENT_DATABASE)
         print(_d_base)
         #Iterate thorugh different types of stimuli on screen
-        all_stim = {}
         for _w_type in ['Target', 'Cue']:
             print(_w_type)
             #Iterate through all keys, i.e. folders in the HDF database, and select only those that contain timestamps of events (only other folders contain the signal itself)
@@ -60,33 +58,38 @@ def CollectAllNumpy():
                 #Iterate through all subjects
                 print(condition)
                 all_subs = []
+                all_info = []
                 for subId in range(0,46):
                     print(subId)
                     #Need to load channels for every subject unfortunately, because they have different caps
-                    channel_names, good_indexes = LoadChannels(subId)
-                    all_subs.append(SelectSlices(condition, _w_type, good_indexes, database[keys['signal'][subId]], database[keys[condition][subId]]))
+                    #Check if any valid trials were recorded
+                    if(database[keys[condition][subId]].empty == False):
+                        channel_names, good_indexes = LoadChannels(subId)
+                        _slice, _info = SelectSlices(condition, _w_type, good_indexes, database[keys['signal'][subId]], database[keys[condition][subId]])
+                        all_subs.append(_slice)
+                        all_info.append(_info)
                 # Collect the repsonses for all subjects in a given event in a given condition and save  them to the file
                 all_conditions[condition] = all_subs
-                path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_i = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_s = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Slices/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_f = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/FFT/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
 
-                if not os.path.exists(path):
-                    os.makedirs(path)
+                createDir(path_i)
+                createDir(path_s)
+                createDir(path_f)
 
-                with open(path  + condition +'.p', "wb") as output:
+                with open(path_i  + condition +'.p', "wb") as output:
+                    pickle.dump(all_info, output)
+
+                with open(path_s + condition +'.p', "wb") as output:
                     pickle.dump(all_subs, output)
 
-            all_stim[_w_type] = all_conditions
-        all_data[_d_base] = all_stim
-    path_alldata = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/'
-    if not os.path.exists(path_alldata):
-        os.makedirs(path_alldata)
-    with open(path_alldata + 'AllData.p', "wb") as output:
-        pickle.dump(all_data, output)
-
-    return all_data
 
 
 
+def createDir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 #--------------FUNCTIONS TO CREATE MNE EPOCHS---------------
@@ -108,21 +111,34 @@ def SelectSlices(event_type, time_type , _good_channels, signal, events):
     FORWARD_WINDOW = forward_window
 
     arr_of_slices = np.zeros([1,1,1])
-
+    slice_info =[[None,None]]
 #    if(events.empty == False):
 #Try because there might have been events codes that never actually occur, like mot miss, or some events were all cut out in eeglab boundaries from a person because of signal noise
     try:
 #First dim (0) is the amount of slices/epochs, second is the number of electrodes and third is the n_samples. It makes a cube depth(epochs) * height(channels) * width (n_samples)
-        arr_of_slices = np.zeros( [len(events[time_type]), len(_good_channels), win_size + forward_window]).astype('float64')
+        arr_of_slices = np.zeros([len(events[time_type]), len(_good_channels), win_size + forward_window]).astype('float64')
 
         for idx, time in enumerate(events[time_type]):
             #Need to transpose because HDF stores electrodes in columns, but MNE in rows
             arr_of_slices[idx,:,:] = signal.iloc[int(time - win_size) : int(time) + forward_window, _good_channels].transpose()
-    except:
-        print("no events were found for: " + event_type)
-        pass
+            #Delete the first row as it isa list of None's, created to avoid an error on return
+            del silce_info[0]
+            slice_info.append([events['Stim_present'].iloc[idx], events['RT'].iloc[idx]])
 
-    return arr_of_slices
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno)
+        #traceback.print_exc()
+
+
+
+
+ #   except:
+       # print("no events were found for: " + event_type)
+       # pass
+
+    return arr_of_slices, pd.DataFrame(slice_info, columns =['stim_present', 'RT'])
 
 
 
