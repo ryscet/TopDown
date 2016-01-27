@@ -10,6 +10,16 @@ from scipy.signal import welch
 import os
 import matplotlib.pyplot as plt
 from scipy.stats.stats import pearsonr
+import scipy.io as sio
+import glob
+
+#------This is here just for ch_names-----#
+badChannels = ['LEar', 'REar', 'Iz', 'A1', 'A2', 'AFz', 'FT9', 'FT10', 'FCz']
+
+events_path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_data/events/';
+events_names = glob.glob(events_path +'*')
+
+#------#
 
 
 ALPHA_RANGE = [3,4,5]
@@ -18,43 +28,70 @@ BETA1_RANGE = [5,6,7,8,9]
 BETA2_RANGE = [10,11,12,13,14]
 
 def CorrelateBandRT():
-        events_attention = loadSingleNumpy('Info', 'before', 'Target', 'att_corr')
-        fft_attention = loadSingleNumpy('FFT', 'before', 'Target', 'att_corr')
-        for electrode in range(0,59):
+    ch_names, lch_idx = LoadChannels(0)
+    events_attention = loadSingleNumpy('Info', 'before', 'Target', 'att_corr')
+    fft_attention = loadSingleNumpy('FFT', 'before', 'Target', 'att_corr')
 
-            fig = plt.figure()
-            al = fig.add_subplot(141)
-            sm = fig.add_subplot(142)
-            b1 = fig.add_subplot(143)
-            b2 = fig.add_subplot(144)
+    all_times =[]
+    all_bands = []
+    for electrode in range(0,59):
 
-            b2.set_xlabel('reaction time')
-            al.set_ylabel('alpha')
-            sm.set_ylabel('SMR')
-            b1.set_ylabel('beta 1')
-            b2.set_ylabel('beta 2')
+#            fig = plt.figure()
+#            fig.suptitle(ch_names[electrode])
+#            al = fig.add_subplot(141)
+#            sm = fig.add_subplot(142)
+#            b1 = fig.add_subplot(143)
+#            b2 = fig.add_subplot(144)
+#
+#            b2.set_xlabel('reaction time')
+#            al.set_ylabel('alpha')
+#            sm.set_ylabel('SMR')
+#            b1.set_ylabel('beta 1')
+#            b2.set_ylabel('beta 2')
+#
+#            dictOfPlots = {'alpha': al, 'smr' : sm, 'beta1': b1, 'beta2':b2}
 
-            for event, fft in zip(events_attention, fft_attention):
-                event = event.dropna()
-                alpha, smr, beta1, beta2 = AvgBand(fft[:,electrode,:])
-                event['z_score'] = Z_score(event['RT'])
-                stim_present_idx =  np.array(event[event['stim_present'] == 1].index.tolist())
-                if(stim_present_idx != []):
-                    marker = 'bo'
-                    al.plot(event['z_score'].ix[stim_present_idx], alpha[stim_present_idx-1], marker)
-                    sm.plot(event['z_score'].ix[stim_present_idx], smr[stim_present_idx -1], marker)
-                    b1.plot(event['z_score'].ix[stim_present_idx], beta1[stim_present_idx-1], marker)
-                    b2.plot(event['z_score'].ix[stim_present_idx], beta2[stim_present_idx-1], marker)
+        times = []
+        bands = []
+        for  event, fft in zip(events_attention, fft_attention):
+            event = event.dropna()
+            event['z_score'] = Z_score(event['RT'])
+            stim_present_idx =  np.array(event[event['stim_present'] == 1].index.tolist())
 
-#                for stim_present, rt, _alpha, _smr, _beta1, _beta2 in zip(event['stim_present'], zscore__rt, alpha, smr, beta1, beta2):
-#                    if (stim_present == 1):
-#                        al.plot(rt, _alpha, 'bo')
-#                        sm.plot(rt, _smr, 'bo')
-#                        b1.plot(rt, _beta1, 'bo')
-#                        b2.plot(rt, _beta2, 'bo')
-            print(electrode)
-       #     return
+            times.append(event['z_score'].ix[stim_present_idx])
+            bands.append(AvgBand(fft[:,electrode,:]))
+        all_times.append(times)
+        all_bands.append(bands)
+    return all_bands, all_times
+#
+#                if(stim_present_idx != []):
+#                    marker = 'bo'
+#                    for band, name in zip( ), ['alpha', 'smr', 'beta1', 'beta2']):
+##IMPORTANT------------- the -1 is inserted beacuse the first for of pandas are always none (artifact of SaveFormats.py), after this is fixed remove the -1 !!!!!!!!
+#                        if(Correlate(, band[stim_present_idx-1])):
+#                           print('subject %d', subID)
+#                           dictOfPlots[name].plot(event['z_score'].ix[stim_present_idx], band[stim_present_idx-1], marker)
+#                        #dictOfPlots[name].annotate('num of subjects: ' + str(numOfSubjects), xy=(.1, .1), xycoords='axes fraction')
+#                    #sm.plot(event['z_score'].ix[stim_present_idx], smr[stim_present_idx -1], marker)
+#                    #b1.plot(event['z_score'].ix[stim_present_idx], beta1[stim_present_idx-1], marker)
+#                    #b2.plot(event['z_score'].ix[stim_present_idx], beta2[stim_present_idx-1], marker)
+#
+##                for stim_present, rt, _alpha, _smr, _beta1, _beta2 in zip(event['stim_present'], zscore__rt, alpha, smr, beta1, beta2):
+##                    if (stim_present == 1):
+##                        al.plot(rt, _alpha, 'bo')
+##                        sm.plot(rt, _smr, 'bo')
+##                        b1.plot(rt, _beta1, 'bo')
+##                        b2.plot(rt, _beta2, 'bo')
+#            print(ch_names[electrode])
+#       #     return
+def Correlate(x,y):
+    r,p = pearsonr(x,y)
+    if((p <= 0.005) and (len(x) > 2)):
 
+        print('found correlation p: ' + str(p) + ' r:' + str(r) + ' length: '+ str(len(x)))
+        return True
+    else:
+        return False
 
 def AvgBand(allTrials):
     '''All trials from a single electrode'''
@@ -209,4 +246,23 @@ def createDir(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
+
+
+def LoadChannels(subID):
+    """Load the data saved in matlab format, extracted before with matlab from eeg struct (the event field) of eeglab
+    Chanlocs are actually chan names, but most eeg software can infare the location from standard naming"""
+    mat_events = [name for name in events_names if '1_TD_ELECTRODES' in name]
+    mat_struct = sio.loadmat(mat_events[subID])
+    n_channels = len(mat_struct['chanlocs'][0,:])
+    chanlocs = [mat_struct['chanlocs'][0,i][0][0] for i in range(0,n_channels)]
+    #First make a list with all indexes
+    good_chan_idx = [i for i in range(len(chanlocs))]
+    #Determine which ones are bad (i.e. do not appear in both caps, but defined manually by a list)
+    bad_chan_idx = [idx for idx, item in enumerate(chanlocs) if item in badChannels]
+    chanlocs = [chan for chan in chanlocs if chan not in badChannels]
+    #Delete their indexes to be used in select slices later
+    for index in sorted(bad_chan_idx , reverse=True):
+        del good_chan_idx[index]
+
+    return chanlocs, good_chan_idx
 
