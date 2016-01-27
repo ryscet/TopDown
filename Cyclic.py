@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 import pandas as pd
-
+import datetime
 
 
 def LoadAll_mean_freq():
@@ -68,10 +68,14 @@ def PlotSubject():
             axes[_idx].plot(subject[_idx,:] - np.nanmean(subject[_idx,:]), color = mycolors[_idx], alpha =0.5)
 
 def CombineDataAndInfo():
+    '''And create additional columns, like time deltas. Filter nans and convert examiner codes'''
     files, freqs = LoadAll_mean_freq()
     info = LoadInfo()
     myReturn = []
-    info['band_fft'] = [np.zeros(7) for i in range(len(info))]
+    info['band_fft'] = None#[np.zeros(7) for i in range(len(info))]
+    info['timestamp'] =  [datetime.datetime.now().date() for i in range(len(info))]
+    info['delta_from_previous'] = [datetime.datetime.now().date() for i in range(len(info))]
+    info['delta_from_first'] = [datetime.datetime.now().date() for i in range(len(info))]
     #Groupy automatically sorts groups
     for name, group in info.groupby('badany'):
         print(name)
@@ -82,12 +86,30 @@ def CombineDataAndInfo():
                 if(~column.isnull().all()):
                    #print(column.values)
                    group['band_fft'].iloc[int(idx)] = column.values
+                   group['timestamp'] = pd.to_datetime(group['data'] + ' ' + group['czas'])
+                   group['delta_from_first'] = group['timestamp'] - group['timestamp'].shift()
+                   group['delta_from_previous'] = (group['timestamp'] - group['timestamp'].iloc[0]).dt.days
         myReturn.append(group)
     myReturn = pd.concat(myReturn, ignore_index = True)
 
     myReturn['timestamp'] = pd.to_datetime(myReturn['data'] + ' ' +myReturn['czas'])
 
+    myReturn['examiner'].loc[myReturn['examiner'].str.contains('Cezary')] = 'Cezary'
+    myReturn['examiner'].loc[myReturn['examiner'].str.contains('LS')] = 'ls'
+
+    myReturn = myReturn.dropna(subset = ['band_fft'] )
     return myReturn
+
+
+
+
+#    for idx, row in complete.iterrows():
+#    print(idx)
+#    print(np.count_nonzero(row['band_fft']) > 0)
+#    np.count_nonzero(np.eye(4))
+#
+#    In [6]: tmp[tmp.apply(lambda x: np.count_nonzero(x['band_fft']))]
+
         #print(len(group))
       #  try:
       #  for idx, row in group.iterrows():
@@ -109,6 +131,9 @@ def index_containing_substring(the_list, substring):
         if substring in s:
               return i
     return None
+
+def GroupbyTrainers():
+    complete.groupby('examiner')
 
        #np.random.randint(10)]
 #        for idx, name in enumerate(names):
