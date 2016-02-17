@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jan  8 11:49:02 2016
-
-@author: ryszardcetnarski
+Check out make data and disct to make sure an appropriate filtering range is selected for pickle(numpy) database, filtered/ for 50hz and filtered_30hz for 30 hz
 """
 from pandas import HDFStore
 import scipy.io as sio
@@ -28,6 +26,7 @@ badChannels = ['LEar', 'REar', 'Iz', 'A1', 'A2', 'AFz', 'FT9', 'FT10', 'FCz']
 #define he windows around events here
 windows_selected = {'Target_back': 1000, 'Target_forth' :0, 'Cue_back':-100, 'Cue_forth': 1000 }
 
+filtering_range = '30Hz'
 
 
 #Used to create MNE epochs code
@@ -70,9 +69,9 @@ def CollectAllNumpy():
                         all_info.append(_info)
                 # Collect the repsonses for all subjects in a given event in a given condition and save  them to the file
                 all_conditions[condition] = all_subs
-                path_i = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
-                path_s = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Slices/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
-                path_f = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/FFT/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_i = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle'+filtering_range+'/Info/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_s = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle'+filtering_range+'/Slices/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
+                path_f = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle'+filtering_range+'/FFT/' + shortName[CURRENT_DATABASE] + '/'+ _w_type+ '/'
 
                 createDir(path_i)
                 createDir(path_s)
@@ -115,21 +114,22 @@ def SelectSlices(event_type, time_type , _good_channels, signal, events):
 #    if(events.empty == False):
 #Try because there might have been events codes that never actually occur, like mot miss, or some events were all cut out in eeglab boundaries from a person because of signal noise
     try:
-#First dim (0) is the amount of slices/epochs, second is the number of electrodes and third is the n_samples. It makes a cube depth(epochs) * height(channels) * width (n_samples)
+    #First dim (0) is the amount of slices/epochs, second is the number of electrodes and third is the n_samples. It makes a cube depth(epochs) * height(channels) * width (n_samples)
         arr_of_slices = np.zeros([len(events[time_type]), len(_good_channels), win_size + forward_window]).astype('float64')
 
         for idx, time in enumerate(events[time_type]):
             #Need to transpose because HDF stores electrodes in columns, but MNE in rows
             arr_of_slices[idx,:,:] = signal.iloc[int(time - win_size) : int(time) + forward_window, _good_channels].transpose()
             #Delete the first row as it isa list of None's, created to avoid an error on return
-            del silce_info[0]
+            del slice_info[0]
             slice_info.append([events['Stim_present'].iloc[idx], events['RT'].iloc[idx]])
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(exc_type, fname, exc_tb.tb_lineno)
-        #traceback.print_exc()
+#        #traceback.print_exc()
+
 
 
 
@@ -139,7 +139,6 @@ def SelectSlices(event_type, time_type , _good_channels, signal, events):
        # pass
 
     return arr_of_slices, pd.DataFrame(slice_info, columns =['stim_present', 'RT'])
-
 
 
 def LoadChannels(subID):
@@ -283,7 +282,7 @@ def MakeDataAndKeys(_current_databse):
 
     keys = database.keys()
 
-    signal_keys = sorted([key for key in keys if 'signal/filtered' in key])
+    signal_keys = sorted([key for key in keys if 'signal/filtered_30' in key])
 
     att_corr_keys = sorted([key for key in keys if 'attention/correct' in key])
     att_miss_keys = sorted([key for key in keys if 'attention/incorrect' in key])

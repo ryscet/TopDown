@@ -21,33 +21,38 @@ import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind as t_test
 import os
 import pickle
-from sklearn.preprocessing import normalize as norm
+#from sklearn.preprocessing import normalize as norm
 #List of epochs types that were already saved(thus there is no need to compute them)
-all_saved_epochs = ['/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/before/Cue/',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/before/Target/',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/after/Cue/',
-                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/Info/after/Target/']
+filtering_range = '30Hz'
+
+all_saved_epochs = ['/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Info/before/Cue/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Info/before/Target/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Info/after/Cue/',
+                       '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Info/after/Target/']
 try:
     ch_names
 except:
-    ch_names =  pickle.load( open('/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/ch_names.p', "rb" ) )
+    ch_names =  pickle.load( open('/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/ch_names.p', "rb" ) )
 
 valid_trials_threshold = 5
 #TODO plot also erps and confirm a good window is taken - check with and without cutting out event time
 #Check why raising error found propably no trial of type'' does not reflect error on the plot, for example a missing plot
 #TODO exclude subjects that has less then n correct trials?
 #TODO change vertical lines to fill_between
-#Todo, add small numbers annotating each line to check if its same eople who produce these high tails in red color
+#Todo, add small numbers annotating each line to check if its same people who produce these high tails in red color
 def Run():
     for training in ['before', 'after']:
         for event in ['Target', 'Cue']:
             for conditions in [['att_corr', 'mot_corr'], ['att_corr', 'att_miss'], ['mot_corr', 'mot_miss'] ]:
                 CompareConditions(training, event, conditions)
+                break
+            break
+        break
 
 
 def loadAllNumpy():
     database = {}
-    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/'
+    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Slices/'
     for training in ['before', 'after']:
         database[training] = {}
         for event in ['Cue', 'Target']:
@@ -57,7 +62,7 @@ def loadAllNumpy():
     return database
 
 def loadSingleNumpy(training, event, condition):
-     path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + training + '/' + event + '/' + condition +'.p'
+     path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Slices/' + training + '/' + event + '/' + condition +'.p'
      return pickle.load( open(path, "rb" ) )
 
 
@@ -90,7 +95,7 @@ def ReverseSubjectElectrodeNesting(list_of_subjects):
 def CollectAllSubsWelch(training, event, condition):
     all_results = []
 
-    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle/' + training + '/' + event + '/'
+    path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Pickle_'+filtering_range+'/Slices/' + training + '/' + event + '/'
 
     results = pickle.load( open(path + condition +'.p', "rb" ))
     #---------Exclude subjectsthat had very few valid trials-------------------------------------
@@ -125,42 +130,44 @@ def Compute_electrode_welch(single_electrode):
         freqs, power = my_welch(epoch, fs  = 500, nperseg =256, nfft = 256, noverlap = 128)
         #power[0,:], changes a shape so then the np.array easilly converts it so that each row is a single trial fft
         all_psd.append(power[0,:])
-
     all_psd = np.array(all_psd)
-    FREQS = freqs[3:36]
-    return np.mean(all_psd, axis = 0)[3:36]
+    FREQS = freqs
+    return np.mean(all_psd, axis = 0)
 
 
 
 def Plot_electrode_welch(all_results, training, event_type, conditions):
     """Takes for an input a dictionary which has two fields, electrodes_a and b. event_type is a string. condition is a list of strings describing what comparison is made"""
-    plt.close('all')
+    #plt.close('all')
 
     for (name_a, electrode_a), (name_b, electrode_b) in zip(all_results[conditions[0]].items(), all_results[conditions[1]].items()):
         fig = plt.figure()
         fig.suptitle(name_a + '\n'+  conditions[0] + ' vs ' + conditions[1] + '\n' + event_type, fontweight = 'bold')
         a_b_conditions = fig.add_subplot(111)
 #Iterate in two seperate loops since they might (and in fact are for sure) of unequal lengths
+        _min = np.argmax(FREQS > 0)
+        _max = np.argmax(FREQS > 30)
         for trial_a in electrode_a:
             #just reshaping
-            normed = trial_a / max(trial_a)
+            normed_a = trial_a[_min:_max] / trial_a[_min:_max].mean()
 
-            a_b_conditions.plot(FREQS, np.log10(normed), color = 'green', alpha = 0.1)
+            a_b_conditions.plot(FREQS[_min: _max], np.log10(normed_a), color = 'green', alpha = 0.1)
 
         for trial_b in electrode_b:
             #just reshaping
-            normed = trial_b / max(trial_b)
-            a_b_conditions.plot(FREQS, np.log10(normed), color = 'red', alpha = 0.1)
+            normed_b = trial_b[_min:_max] / trial_b[_min:_max].mean()
+            a_b_conditions.plot(FREQS[_min:_max], np.log10(normed_b), color = 'red', alpha = 0.1)
 
-        a_b_conditions.set_xlim(min(FREQS), max(FREQS))
+     #   a_b_conditions.set_xlim(min(FREQS), max(FREQS))
         a_b_conditions.set_xlabel('Frequency')
         a_b_conditions.set_ylabel('Welch power spectrum')
 
         try:
-       #     a_b_conditions.plot(FREQS, np.log10(electrode_a.mean(axis = 0)) / max(np.log10(electrode_a.mean(axis = 0))),label = conditions[0], linewidth=2, color = 'green')
-         #   a_b_conditions.plot(FREQS, np.log10(electrode_b.mean(axis = 0)) / max(np.log10(electrode_a.mean(axis = 0))) ,label = conditions[1], linewidth=2, color = 'red')
-
-
+            mean_a = electrode_a.mean(axis = 0)#[_min:_max]
+            mean_b = electrode_b.mean(axis = 0)
+         #   print(mean_a)
+            a_b_conditions.plot(FREQS[_min:_max], np.log10(mean_a[_min:_max]/mean_a[_min:_max].mean()) ,label = conditions[0], linewidth=2, color = 'green')
+            a_b_conditions.plot(FREQS[_min:_max], np.log10(mean_b[_min:_max]/mean_b[_min:_max].mean()) ,label = conditions[1], linewidth=2, color = 'red')
 
             p_vals = []
             for frequency in range(0, len(FREQS)):

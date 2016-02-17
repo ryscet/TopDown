@@ -64,7 +64,7 @@ def storeEEGinHDF():
         sig = pd.DataFrame(sio.loadmat(recording,struct_as_record=True)['eegToSave']).transpose()
         #Modified here to save  a filtered version from: store[subId + "/signal/f"] =  sig.convert_objects())
 
-        store[subId + "/signal/filtered/"] =  sig.convert_objects().apply(FilterData, axis = 0)
+        store[subId + "/signal/filtered_30/"] =  sig.convert_objects().apply(FilterData, axis = 0)
         print(cnt)
     store.close()
 
@@ -98,9 +98,9 @@ def SAVE_ChangeDictOrder(_processedEvents):
 
 
 def FilterData(channel):
-    b_pass = filters.bandpass(channel, freqmin = 2, freqmax = 70, df = 500)
-    b_stop =filters.bandstop(b_pass, freqmin = 49 ,freqmax = 51, df = 500)
-    return b_stop
+    b_pass = filters.bandpass(channel, freqmin = 2, freqmax = 30, df = 500)
+   # b_stop =filters.bandstop(b_pass, freqmin = 49 ,freqmax = 51, df = 500)
+    return b_pass
 
 
 
