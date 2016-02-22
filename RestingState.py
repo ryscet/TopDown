@@ -21,7 +21,7 @@ from random import random
 #bands_range_dict =  {'theta':(4,7),'alpha': (8,12), 'smr': (12,15), 'beta1':(15,22), 'beta2':(22,50), 'trained':(12,22)}
 
 def PlotPaired(band, normed_abs):
-
+    normed_abs = ''
     path = '/Users/ryszardcetnarski/Desktop/Figs_RS_Changes/'
 
 
@@ -60,7 +60,7 @@ def PlotPaired(band, normed_abs):
     ax_hist.legend(loc ='best')
 
     ax_diff.hist(diff, bins = 15, normed = False, color = 'b',alpha = 0.5, label = 'after - before' )
-    ax_hist.set_xlabel('normalized-amplitude  distribution')
+    ax_hist.set_xlabel(normed_abs +'amplitude  distribution')
     ax_diff.set_xlabel('differences distribution')
     ax_diff.axvline(0, color = 'b', linestyle = 'dashed', linewidth = 2, label = '0 - środek')
 
@@ -101,12 +101,24 @@ def RunAllBands():
 
 
 def Permutation_Paired(band, normed_abs):
+
     path = '/Users/ryszardcetnarski/Desktop/Permutations/Scatter/Paired/'
 
-    n_perm = 1000#0
+    cond_dict = {'plus': 0, 'minus':1, 'sham':2, 'control':3}
+    cond_colors = ['red', 'blue', 'grey', 'yellow']
+    n_perm = 10#0
     joined= pd.concat([ExtractBands_colstack('before', normed_abs), ExtractBands_colstack('after', normed_abs)], axis = 1)
+
+
+    names, conditions, electrodes = LoadRestingInfo()
+
+
+    joined['conditions'] = conditions
+    joined['names'] = names
+
     befores = joined[band+'_before'].as_matrix()
     afters = joined[band+'_after'].as_matrix()
+
 
     fig = plt.figure()
     fig.suptitle(band  + '\npaired')
@@ -119,10 +131,10 @@ def Permutation_Paired(band, normed_abs):
         afters_p = np.random.permutation(afters)
         tmp_dict = CalcDifferencesRatio(befores, afters_p)
 
-       # fig = plt.figure()
-        #ax = fig.add_subplot(111)
-        #ax.scatter( afters_p - befores,befores, color = colors[i], alpha = 0.2, edgecolors='w', s = 100)
-        #ax.scatter( afters - befores,befores, color = 'r', alpha = 0.5, edgecolors='w', s = 100)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.scatter( afters_p - befores,befores, color = colors[i], alpha = 0.2, edgecolors='w', s = 100)
+        ax.scatter( afters - befores,befores, color = 'r', alpha = 0.5, edgecolors='w', s = 100)
 
         ax1.scatter( afters_p - befores,befores, color = 'b', alpha = 0.02, edgecolors='w', s = 100, label = 'permutation' if i == 0 else "")
 
@@ -132,7 +144,11 @@ def Permutation_Paired(band, normed_abs):
             perm_results[key].append(value)
     PlotPermutation(original_results, perm_results, band, 'Paired', normed_abs)
  #   return original_results, perm_results
-    ax1.scatter( afters - befores,befores,color = 'r', alpha = 0.8, edgecolors='w', s = 100, label = 'original')
+    #ax1.scatter( afters - befores,befores,color = 'r', alpha = 0.8, edgecolors='w', s = 100, label = 'original')
+
+    for i in range(0,len(afters)):
+        ax1.scatter( afters[i] - befores[i],befores[i],color = cond_colors[cond_dict[joined['conditions'].iloc[i]]], alpha = 0.8, edgecolors='w', s = 100)
+
     ax1.set_xlabel('After - Before')
     ax1.set_ylabel('Before')
     ax1.legend(loc = 'best')
@@ -271,6 +287,7 @@ def ExtractBands_rowstack(before_after, normed_abs):
     return band_vals
 
 def ExtractBands_colstack(before_after, normed_abs):
+    """Normally use this one"""
     SHIFT = 2
     bands_dict =  {'theta':(4,8),'alpha': (8,12), 'smr': (12,15), 'beta1':(15,22), 'beta2':(22,30), 'trained':(12,22)}
     #P3, P4, P5, P6
@@ -291,13 +308,7 @@ def ExtractBands_colstack(before_after, normed_abs):
         amps =np.mean(np.sum(box[:, f_range[0] - SHIFT -1:f_range[1] - SHIFT ,:], axis =1 ), axis =1)
         band_vals[band_name + '_' + before_after] =amps
 
- #       only_sums = np.sum(box[:, f_range[0] - SHIFT -1:f_range[1] - SHIFT ,:], axis =1 )
 
-  #      normed = only_sums / sum_subjec_electrode
-
-   #     band_vals['rel_' + band_name + '_' + before_after] = np.mean(normed, axis = 1)
-
-        #return only_sums
 
 
 
@@ -331,7 +342,7 @@ def HistRegResiduals(freq1,freq2):
 
     names, conditions, electrodes = LoadRestingInfo()
 
-    joined = pd.concat([ExtractBands_colstack('before'), ExtractBands_colstack('after')], axis  =1)
+    joined = pd.concat([ExtractBands_colstack('before', ''), ExtractBands_colstack('after','')], axis  =1)
 
     joined['conditions'] = conditions
     joined['names'] = names
@@ -435,7 +446,7 @@ def LoadResting(before_after, normed_abs):
     return mat_struct
 
 def PlotAll():
-    before, after = LoadResting('before')[:,:,18], LoadResting('after')[:,:,18]
+    before, after = LoadResting('before', 'normed_')[:,:,18], LoadResting('after', 'normed_')[:,:,18]
 
     for sub_before, sub_after in zip(before, after):
         fig = plt.figure()

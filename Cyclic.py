@@ -198,25 +198,29 @@ def PlotSubject():
         for _idx, name in enumerate(names):
             axes[_idx].plot(subject[_idx,:] - np.nanmean(subject[_idx,:]), color = mycolors[_idx], alpha =0.5)
 
-def CombineDataAndInfo():
+def CombineDataAndInfo_ForBaseline():
     '''And create additional columns, like time deltas. Filter nans and convert examiner codes'''
     files, freqs = LoadAll_mean_freq_baseline()
     info = LoadInfo()
     myReturn = []
-    info['band_fft'] = [[] for i in range(len(info))]
+    info['baseline_fft'] = [[] for i in range(len(info))]
     info['timestamp'] =  [datetime.datetime.now().date() for i in range(len(info))]
     info['delta_from_previous'] = [datetime.datetime.now().date() for i in range(len(info))]
     info['delta_from_first'] = [datetime.datetime.now().date() for i in range(len(info))]
     #Groupy automatically sorts groups
     for name, group in info.groupby('badany'):
         print(name)
+        #Checking if nem from opis exists in fft files
         file_idx = index_containing_substring(files, name)
         #Try because there are some subjects in the opis that are not in the files
         if(file_idx is not None):
-            for idx,column in freqs[file_idx].iteritems():
+       #     for idx,column in freqs[file_idx].iteritems():
+            for idx,session in enumerate(freqs.T):
+
                 if(~column.isnull().all()):
                    #print(column.values)
-                   group['band_fft'].iloc[int(idx)] = column.tolist()
+         #          group['baseline_fft'].iloc[int(idx)] = column.tolist()
+         #          group['baseline_fft'].iloc[int(idx)] = column.tolist()
                    group['timestamp'] = pd.to_datetime(group['data'] + ' ' + group['czas'])
                    group['days_from_previous'] = (group['timestamp'] - group['timestamp'].shift()).dt.days
                    group['days_from_first'] = (group['timestamp'] - group['timestamp'].iloc[0]).dt.days
@@ -230,14 +234,31 @@ def CombineDataAndInfo():
 #some weird one entry with no name
     myReturn['examiner'].iloc[520] = 'ls'
 
-    myReturn = myReturn[myReturn['band_fft'].str.len() != 0]
+    myReturn = myReturn[myReturn['baseline_fft'].str.len() != 0]
 
-    myReturn = myReturn.dropna(subset = ['band_fft'] )
+    myReturn = myReturn.dropna(subset = ['baseline_fft'] )
 
-    myReturn['avg_fft'] = np.array(myReturn['band_fft'].tolist()).mean(axis = 1)
+    myReturn['avg_fft'] = np.array(myReturn['baselinefft'].tolist()).mean(axis = 1)
     myReturn['fft_diff'] = myReturn['avg_fft'] - myReturn['avg_fft'].shift()
     myReturn.to_hdf('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/opis_complete_baseline.hdf5', 'opis')
     return myReturn
+
+def PlotBaselines_Selected():
+   names = [ 'theta', 'alpha', 'smr', 'beta1', 'beta2', 'trained']
+   mycolors = ['blue', 'magenta', 'green', 'yellow', 'red', 'violet', 'grey']
+   files,mean_freq = LoadAll_mean_freq_baseline()
+   for name, subject in zip(files, mean_freq):
+       fig = plt.figure()
+       fig.suptitle(name[-12:-4])
+       ax = fig.add_subplot(111)
+       idx = 0
+       for row in subject[0,1::,:]:
+          # print(column)
+           ax.plot(row, color = mycolors[idx],label =names[idx] )
+           idx = idx+1
+
+       ax.legend()
+
 
 
 
@@ -319,47 +340,38 @@ def Explore(complete):
   #  ax.set_xlim(0,40)
     ax.set_xlabel('days from previous training')
     ax.set_ylabel('absolute change in avg fft')
+
+
 def makeArray(text):
     return np.fromstring(text,sep=' ')
 
-
-       #np.random.randint(10)]
-#        for idx, name in enumerate(names):
-#            print(idx)
-#            axes[idx].plot([1,2],[1,np.random.randint(10)], color = mycolors[idx], alpha = 0.5)
-#            start, end = axes[idx].get_xlim()
-#            axes[idx].xaxis.set_ticks(np.arange(start, end, 1))
-        #axes[idx].legend(loc = 'best')
-
-
-#
-#
-#        if(PlotAll):
-#            fig = plt.figure()
-#            ax = fig.add_subplot(111)
-#            fig.suptitle(path)
-#
-#
-
-
-        #colors =cm.jet()
-       # crange = np.linspace(0,255,len(subject[0,0,:] ))
-#        for idx in range(0, len(subject[0,0,:])):
-#            ax.plot(np.log10(subject[0,0:50,idx]), color = cm.afmhot(int(crange[idx])))
 
 
 
 def LoadAll_mean_freq_baseline():
 #FFT's from tura 3 i 2 were not combined, only the mean freqs were
+    subset = ['EID-NFBSS-09509113','EID-NFBSS-2D3A067E','EID-NFBSS-2F24E93F','EID-NFBSS-2FE454B7','EID-NFBSS-509FE52C','EID-NFBSS-56F70D3B', 'EID-NFBSS-B14C2F87','EID-NFBSS-C9FF2272', 'EID-NFBSS-EE44B560']
 
-    electrode = '/F3_'
     path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/Baseline_mean_freqs/'
-    files =  [file for file in glob.glob(path +'*') if electrode in file]
-    _all = []
-    for file in files:
-        #squeeze removes the first dimension, because it's actually a 2d array mean_freq x week, but is stored in a 1 x fre x week format. 1 is removed
-        _all.append(pd.DataFrame(np.squeeze(sio.loadmat(file)['freq_amp'],0)))#.dropna(axis = 1, how ='all'))
-    return  files, _all
+
+    all_electrodes = []
+    _all_files = []
+    for electrode in ['/F3_', '/F4_', '/P3_', '/P4_']:
+        #Get all file names
+        all_files = glob.glob(path +'*')
+        #Filter for selected names, uncomment when needed
+        all_files = [i for e in subset for i in all_files if e in i]
+
+        files =  [file for file in all_files if electrode in file and 'proc' not in file]
+        _all = []
+        for file in files:
+            _all.append(sio.loadmat(file)['freq_amp'])
+        all_electrodes.append(_all)
+        #Could return all files if selecting by subjects is needed
+        _all_files.append([file[-12::] for file in files])
+    average_all_electrodes =AverageElectrodes(all_electrodes)
+
+    return files, average_all_electrodes
 
 def LoadAll_fft_baseline():
 #FFT's from tura 3 i 2 were not combined, only the mean freqs were
@@ -387,6 +399,13 @@ def LoadAll_mean_freq_Treningi():
         all_files.append([file[-12::] for file in files])
     average_all_electrodes =AverageElectrodes(all_electrodes)
     return files, average_all_electrodes
+
+
+def PrepareDatabase():
+    info = LoadInfo()
+    info = info.set_index(['badany'])
+   # subject_grouped = info.groupby('badany')
+    return info
 
 def LoadInfo():
     path_tura2 = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/opis_tura_2.csv'
