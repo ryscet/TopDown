@@ -52,34 +52,117 @@ def CorrelateTrainingBaseline():
     sns.jointplot("baseline", "training", data=base_train, kind="reg", color="r", size=7)
     return base_train
 
-#    reduced_db = pd.DataFrame([ExtractBands(db, 'training', 'alpha'), db['days_from_first'].values]).transpose()
-#    reduced_db['subject'] = db.index
-#    reduced_db.columns =  ['amp', 'days_from_start', 'subject']
-#
-#        # Initialize a grid of plots with an Axes for each walk
-#    grid = sns.FacetGrid(reduced_db, col='subject', hue='subject',)
-#
-#    # Draw a horizontal line to show the starting point
-#    #grid.map(plt.axhline, y=0, ls=":", c=".5")
-#
-#    # Draw a line plot to show the trajectory of each random walk
-#    grid.map(plt.plot, 'days_from_start', 'amp', marker="o")#, ms=4)
-#
-#    # Adjust the arrangement of the plots
-#    grid.fig.tight_layout()#w_pad=1)
+def RunAllGrouped():
+    bands = ['all_spectrum', 'alpha', 'beta1', 'beta2', 'smr','ratio', 'theta', 'trained', 'ratio']
+    for band in bands:
+        GroupedDistributionsPlot(band)
 
-   # return reduced_db
 
-    #fig = plt.
 
-def PlotIndivisualDistributions():
+def GroupedDistributionsPlot(band):
+    path = '/Users/ryszardcetnarski/Desktop/GroupedDistributions/'
+    plt.style.use('seaborn-bright')
+    db = LoadDatabase()
+    rest = prep.Load_rest()
+    kde_bandwith = 0.8
+
+    #dist_func = gaussian_kde(initial, )
+
+    #axes for plotting
+    fig = plt.figure()
+    #ax = [fig.add_subplot(220+idx+1) for idx, band in enumerate(bands)]
+    ax = fig.add_subplot(111)
+
+    all_training = []
+    all_baseline = []
+
+    all_rest_after = []
+    plot_lims = {'all_spectrum': (-60,60), 'alpha': (-10,10), 'beta1': (-20,20), 'beta2': (-20,20),
+    'beta3':(-20,20), 'smr':(-5,5),'ratio': (-1.2,1.2), 'theta':(-10,10), 'trained':(-15,15) }
+  #  i is just for labels not to duplicate
+    i = 0
+    for name, subject in db.groupby(db.index):
+
+        if name in rest:
+
+            #Name is subject, .mean() is taken from the four training electrodes
+
+            rest_before = rest[name]['Before'].loc[band].mean()
+
+            training = ExtractBands(subject, 'training', band)
+            all_training.extend(training - rest_before )
+
+            baseline = ExtractBands(subject.dropna(subset = ['baseline_bands']), 'baseline', band)
+            all_baseline.extend(baseline - rest_before)
+
+            training_distribution = gaussian_kde(training - rest_before, kde_bandwith)
+            baseline_distribution = gaussian_kde(baseline - rest_before, kde_bandwith)
+
+
+
+            ax.axvline(rest[name]['After'].loc[band].mean() - rest_before, color = 'black',alpha = 0.2, linestyle = 'dashed', linewidth = 2, label = 'rest po' if i == 0 else "")
+
+            all_rest_after.append(rest[name]['After'].loc[band].mean() - rest_before)
+
+
+           # ax.set_xlim(-50, 50)
+           # ax.set_ylim(0, 0.2)
+            xmin, xmax = plot_lims[band]
+            #xmin, xmax = ax.get_xlim()
+            x = np.linspace(xmin, xmax, 1000)
+#
+            ax.plot(x , training_distribution(x), color = 'blue', alpha = 0.3, label ='dystrybucja trening'  if i == 0 else "")
+            ax.plot(x , baseline_distribution(x), color = 'green',alpha = 0.3, label ='dystrybucja baseline'  if i == 0 else "")
+
+            ax.set_title(band)
+            #Iterator only used for labels
+            i = i +1
+             #Dirty hack
+            if(band == 'alpha'):
+                ax.set_ylim(0,1)
+
+#            if(idx == 3):
+#                ax[idx].legend(loc = 'best')
+#            print(xmin)
+#            #return
+
+           # fig.savefig(path + name +'.png', dpi = 400)
+
+            #break
+           #rest.loc[name]['Before'].loc['alpha'])
+           # return rest.loc[name]['Before'].loc['alpha']
+        else:
+            print('Not in rest: '+name)
+    ax.axvline(0, color = 'red', linestyle = 'dashed', linewidth = 3,alpha = 0.9, label = 'rest przed')
+
+
+    all_training = np.array(all_training)
+    all_baseline = np.array(all_baseline)
+
+    train_group_ditribution = gaussian_kde(all_training, kde_bandwith)
+    base_group_ditribution = gaussian_kde(all_baseline, kde_bandwith)
+
+    ax.plot(x , train_group_ditribution(x) *5, color = 'blue', alpha = 0.8)
+   # ax.plot(x , base_group_ditribution(x) *5, color = 'green', alpha = 0.8)
+
+    ax.axvline(np.array(all_rest_after).mean(), color = 'black', linestyle = 'dashed', linewidth = 2,alpha = 0.5)
+
+    ax.set_xlim(plot_lims[band])
+
+    ax.legend()
+
+    plt.tight_layout()
+    ax.grid(b=False)
+    fig.savefig(path+ '_' + band +'.png', dpi =300)
+
+
+def IndivisualDistributionsPlot():
     path = '/Users/ryszardcetnarski/Desktop/Distributions/'
     plt.style.use('ggplot')
     db = LoadDatabase()
     rest = prep.Load_rest()
     kde_bandwith = 0.8
 
-    #dist_func = gaussian_kde(initial, )
 
 
     #Vector for plotting
@@ -98,25 +181,30 @@ def PlotIndivisualDistributions():
             training_distribution = gaussian_kde(training, kde_bandwith)
             baseline_distribution = gaussian_kde(baseline, kde_bandwith)
 
-            ax[idx].hist(training, alpha = 0.2, normed = True, color = 'blue')
-            ax[idx].hist(baseline, alpha = 0.2, normed = True, color = 'yellow')
+            ax[idx].hist(training , alpha = 0.2, normed = True, color = 'blue')
+            ax[idx].hist(baseline , alpha = 0.2, normed = True, color = 'yellow')
 
 
             if name in rest:
                 ax[idx].axvline(rest[name]['Before'].loc[band].mean(), color = 'b', linestyle = 'dashed', linewidth = 2, label = 'rest przed')
                 ax[idx].axvline(rest[name]['After'].loc[band].mean(), color = 'r', linestyle = 'dashed', linewidth = 2, label = 'rest po')
+                # ax[idx].axvline(0, color = 'b', linestyle = 'dashed', linewidth = 2, label = 'rest przed')
+                # ax[idx].axvline(0, color = 'r', linestyle = 'dashed', linewidth = 2, label = 'rest po')
+
             else:
                 print(name)
 
             xmin, xmax = ax[idx].get_xlim()
             x = np.linspace(xmin-1, xmax+1, 100)
-
-            ax[idx].plot(x, training_distribution(x), color = 'blue', label ='dystrybucja trening')
-            ax[idx].plot(x, baseline_distribution(x), color = 'yellow', label ='dystrybucja baseline')
+#
+            ax[idx].plot(x , training_distribution(x), color = 'blue', label ='dystrybucja trening')
+            ax[idx].plot(x , baseline_distribution(x), color = 'yellow', label ='dystrybucja baseline')
 
             ax[idx].set_title(band)
             if(idx == 3):
                 ax[idx].legend(loc = 'best')
+
+
 
         fig.savefig(path + name +'.png', dpi = 400)
 
@@ -127,7 +215,7 @@ def PlotIndivisualDistributions():
 
 
 def LoadDatabase():
-    df = pd.read_pickle('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/DatabaseTrainBase.pkl')
+    df = pd.read_pickle('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/DatabaseTrainBaseUPDATED.pkl')
     return df
 
 

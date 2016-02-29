@@ -23,6 +23,7 @@ def PrepareDatabase():
     info = LoadInfo()
     info['badany'] = info['badany'].str.replace('EID-NFBSS-','')
     trainings = LoadAll_mean_freq('train')
+    conditions, exclude = LoadConditionsInfo()
 
     list_of_df = []
     #Convert string timestamps saved for date and time separately into pandas datetime object
@@ -30,7 +31,7 @@ def PrepareDatabase():
 
     for subject, df in info.groupby('badany'):
     #There are some subjects int the original spreadsheet that we dont have the eeg of :EID-NFBSS-092DF7C4, EID-NFBSS-7EAC5897,EID-NFBSS-9F3106OD,EID-NFBSS-CC2C8039
-        if(subject in list(trainings.keys())):
+        if((subject in list(trainings.keys())) and (subject not in exclude)):
             #Create a list of sessions. Split the cube, where depth is sessions, into individual layers, ie. bands (row) by blocks (columns)
             #Drop ones with nans and zeroes, correct session number is the index from the mat file not the number in the opis (there sessions were incremented even after a failed one)
             valid_sessions = [session for session in trainings[subject] if np.isnan(session).all() == False if np.count_nonzero(session) >0]
@@ -41,8 +42,13 @@ def PrepareDatabase():
             #Normalize date removes hours, minutes etc, so that 23 houtrs diff is still treated as a whole day
             df['days_from_first'] = (df['timestamp'].apply(pd.datetools.normalize_date) - df['timestamp'].apply(pd.datetools.normalize_date).iloc[0]).dt.days
             df['days_from_previous'] = (df['timestamp'].apply(pd.datetools.normalize_date) - df['timestamp'].apply(pd.datetools.normalize_date).shift()).dt.days
+            df['condition'] = [conditions.loc[subject]['condition']for i in range(0,len(df))]
+            #print(conditions.loc[subject])
 
             list_of_df.append(df)
+    else:
+        print('Excluded or not found:')
+        print(subject)
     #Merge groups from groupby
     db = pd.concat(list_of_df, ignore_index =True)
 
@@ -54,7 +60,7 @@ def PrepareDatabase():
     db['n_blocks'] =[np.sum(x) for x in list_of_ints]
     db['original_row_number'] = np.linspace(0,len(db)-1, len(db))
     db = AddBaselinesToDb(db)
-    #db = db[['sesja','timestamp','baseline_bands', 'training_bands','days_from_first','days_from_previous','n_blocks', 'bloki', 'original_row_number']]
+    db = db[['sesja','timestamp','baseline_bands', 'training_bands','days_from_first','days_from_previous','n_blocks', 'bloki', 'original_row_number', 'condition']]
     return db
 
 def SaveToDisk(df):
@@ -170,6 +176,7 @@ def LoadInfo():
     #obie_tury.set_index('badany')
     return obie_tury
 
+#NOT USED
 def PrepareMeanFreqs(cube):
     '''Makes an average from all blocks, so the result are changes per session. Appends columns of Nans for incomplete sessions. Converts 0's to Nan's'''
     averaged = cube.mean(axis = 0)
@@ -194,6 +201,7 @@ def AverageElectrodes(all_electrodes):
 
 
 def PrepareRestingDb():
+    #NOT USED
     """Call this function from other scripts calling this one"""
     names, conditions, electrodes = LoadRestingInfo()
     rest_before = ExtractBands('before','')
@@ -202,6 +210,13 @@ def PrepareRestingDb():
     rest = rest.set_index( [names])
 
     return rest
+
+def ExtractBands(db, train_base, band):
+    all_sessions= db[train_base +'_bands']
+    all_session_one_band = []
+    for session in all_sessions:
+        all_session_one_band.append(np.mean(session.loc[band]))
+    return np.array(all_session_one_band)
     #for idx, name in enumerate(names):
     #    rest_db['name'] = rest[idx,:,:]
 
@@ -286,8 +301,12 @@ def Load_rest():
         #all_subjects[subject] = all_electrodes
     return all_subjects
 
-
-
+def LoadConditionsInfo():
+    subjects_path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/subjects_conditions.csv'
+    exclude_path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/exclude.csv'
+    info = pd.read_csv(subjects_path, index_col = 'subject')
+    exclude = pd.read_csv(exclude_path)['subject'].tolist()
+    return info, exclude
 
 #def Z_score(vector):
 ##Sanity check, should be a numpy array anyways. If not np, then subtraction might not subtract a constant from all elements
