@@ -1,0 +1,84 @@
+Length of >=11 blocks
+length of recorded baselines
+
+%EID-NFBSS-20880307
+%11
+%10
+%#Sesja 8 nie ma baselineu mimo ze jest 11 - zmieniam na 10
+
+EID-NFBSS-2FE454B7
+16
+17
+%brak sesji nr 5, usuwam baseline (index 4)
+
+%EID-NFBSS-4D11A3CA
+%15
+%14
+%Sesja 19 (index baseline 14) nie ma baselineu, mimo numerka blokow 13 (2 1 10), zmieniam na 10
+
+EID-NFBSS-888B1F99
+16
+17
+Brakuje sesji 4, ale baseline jest. Wywalam baseline index 3
+
+%EID-NFBSS-8F4C0A83
+%16
+%14
+%sesja 1 ma 12 blokow (1 11) ale nie ma basline, zamieniam na 10.
+%sesja 18 ma 11 blokow (10 1) ale nie ma basline, zamieniam na 10.
+
+
+%EID-NFBSS-B37A62C7
+%13
+%12
+%Sesja nr 5 ma 11 (0 10 1) blokow ale nie ma baselineu, zamieniam na 10
+
+%EID-NFBSS-A13D90CD
+%9
+%8
+%Brak baselineu index 3, sesje zaczynaja sie od nr 2, zamieniam odpowiadajaca sesje - nr 5 z 11 (1 10) na 10
+
+%EID-NFBSS-C9FF2272
+%15
+%17
+%sesja nr 10 ma baseline ale nr blokow 10 (10), dodaje 1
+%sesja nr 17 (idx 15) ma 6 blokow, ale ma baseline - sprawdzic (w danych jest 10 blokow)
+
+EID-NFBSS-E693F5C0
+18
+19
+Brak sesji 7 (basline index 6) ale baseline jest, usuwam baseline
+
+%EID-NFBSS-E74988F1
+%13
+%12
+%Sesja numer 7 ma 11 (1 10) blokow, baseline idx 6 brakuje,zmieniam na 10
+
+%EID-NFBSS-F4FC5670
+%16
+%15
+%sesja numer 5 ma 12 (3 8) blokow, baselinu nie mam, zmieniam na 10 
+
+
+20880307
+
+dodalem 1 do ilosci blokow w sesji 10 (oryginalnie 10 blokow, po mojej zmianie 11) - baseline na tej pozycji byl
+
+
+A13d90CD
+
+dodalem 1 do ilosci blokow w sesji 5 (oryginalnie 10 blokow, po mojej zmianie 11) - baseline na tej pozycji byl
+
+E74988f1, znalazl sie baseline z sesji 7, z 0 10, 1 10 w opisie
+
+########
+
+dodalem nastepujace linijki - wczesniej je usuwalem bo nie bylo sesji, po wzieciu ostatnich danych juz sa
+
+EID-NFBSS-FEC68D38,2015.01.31,10:56:32,17,10,a1000595.mdb,1,1,1,LS
+
+EID-NFBSS-E693F5C0,2015.04.24,11:47:44,07,[1,10],a1000782.mdb,2,1,1,[]
+
+EID-NFBSS-888B1F99,2015.04.25,09:27:35,04,[6,1,4],a1000790.mdb,3,1,1,[]
+
+EID-NFBSS-2FE454B7,2015.04.20,12:21:20,05,[1,1,11],a1000758.mdb,3,1,1,[]

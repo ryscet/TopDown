@@ -1,29 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Jan 21 13:55:56 2016
-
-@author: ryszardcetnarski
-"""
-
-import glob
-import scipy.io as sio
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import numpy as np
-import pandas as pd
-import datetime
-import seaborn as sns
-#from string import letters
-from matplotlib import cm as cm
-
-from pylab import *
-from scipy import *
-from scipy import optimize
-
-from sklearn.metrics import mean_squared_error
-from math import sqrt
-from scipy.stats import spearmanr
-from scipy.stats.mstats import normaltest
 
 def Plot_Amp_Per_Session():
     plt.style.use('ggplot')
@@ -261,20 +235,6 @@ def PlotBaselines_Selected():
 
 
 
-
-def LoadOpis():
-    #Make sure not load baseline or other
-    opis=pd.read_hdf('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/opis_complete_baseline.hdf5', 'opis')
-    return opis
-
-
-
-def index_containing_substring(the_list, substring):
-    for i, s in enumerate(the_list):
-        if substring in s:
-              return i
-    return None
-
 def GroupbyTrainers():
     complete = LoadOpis()
     fig = plt.figure()
@@ -347,112 +307,22 @@ def makeArray(text):
 
 
 
-
-def LoadAll_mean_freq_baseline():
-#FFT's from tura 3 i 2 were not combined, only the mean freqs were
-    subset = ['EID-NFBSS-09509113','EID-NFBSS-2D3A067E','EID-NFBSS-2F24E93F','EID-NFBSS-2FE454B7','EID-NFBSS-509FE52C','EID-NFBSS-56F70D3B', 'EID-NFBSS-B14C2F87','EID-NFBSS-C9FF2272', 'EID-NFBSS-EE44B560']
-
-    path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/Baseline_mean_freqs/'
-
-    all_electrodes = []
-    _all_files = []
-    for electrode in ['/F3_', '/F4_', '/P3_', '/P4_']:
-        #Get all file names
-        all_files = glob.glob(path +'*')
-        #Filter for selected names, uncomment when needed
-        all_files = [i for e in subset for i in all_files if e in i]
-
-        files =  [file for file in all_files if electrode in file and 'proc' not in file]
-        _all = []
-        for file in files:
-            _all.append(sio.loadmat(file)['freq_amp'])
-        all_electrodes.append(_all)
-        #Could return all files if selecting by subjects is needed
-        _all_files.append([file[-12::] for file in files])
-    average_all_electrodes =AverageElectrodes(all_electrodes)
-
-    return files, average_all_electrodes
-
-def LoadAll_fft_baseline():
-#FFT's from tura 3 i 2 were not combined, only the mean freqs were
-    electrode = '/F3_'
-    path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/Baseline_ffts/'
-    files =  [file for file in glob.glob(path +'*') if electrode in file]
-    _all = []
-    for file in files:
-        #squeeze removes the first dimension, because it's actually a 2d array mean_freq x week, but is stored in a 1 x fre x week format. 1 is removed
-        _all.append(sio.loadmat(file)['res_all'])
-    return files,  _all
-
-def LoadAll_mean_freq_Treningi():
-#TODO check whats up with the overlapping subjects from tura 2 and 3, repeat when normalization amplitude methds are finally decided (divide by sum/mean, take sum/mean)
-    path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/Treningi_mean_freqs/'
-    all_electrodes = []
-    all_files = []
-    for electrode in ['/F3_', '/F4_', '/P3_', '/P4_']:
-        files =  [file for file in glob.glob(path +'*') if electrode in file and 'proc' not in file]
-        _all = []
-        for file in files:
-            _all.append(PrepareMeanFreqs(sio.loadmat(file)['freq_amp']))
-        all_electrodes.append(_all)
-        #Could return all files if selecting by subjects is needed
-        all_files.append([file[-12::] for file in files])
-    average_all_electrodes =AverageElectrodes(all_electrodes)
-    return files, average_all_electrodes
-
-
-def PrepareDatabase():
-    info = LoadInfo()
-    info = info.set_index(['badany'])
-   # subject_grouped = info.groupby('badany')
-    return info
-
-def LoadInfo():
-    path_tura2 = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/opis_tura_2.csv'
-    info_tura2 = pd.read_csv(path_tura2, delimiter = ',', header = 0).fillna('kasia')
-
-    path_tura3 = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/opis_tura_3.csv'
-    info_tura3 = pd.read_csv(path_tura3, delimiter = ',', header = 0).fillna('kasia')
-
-    obie_tury = info_tura2.append(info_tura3, ignore_index=True)
-    return obie_tury
-
-def PrepareMeanFreqs(cube):
-    '''Makes an average from all blocks, so the result are changes per session. Appends columns of Nans for incomplete sessions. Converts 0's to Nan's'''
-    averaged = cube.mean(axis = 0)
-    if(len(averaged[0,:] < 20)):
-        filler = numpy.empty((7,20 - len(averaged[0,:])))
-        filler[:,:] = np.NAN
-
-    fullSize = np.hstack((averaged, filler))
-    fullSize[fullSize == 0] = np.NAN
-    return fullSize
-
-def AverageElectrodes(all_electrodes):
-    all_avg = []
-    for F3, F4, P3, P4 in zip(all_electrodes[0],all_electrodes[1], all_electrodes[2], all_electrodes[3]):
-        sub_avg = (F3 + F4 + P3 + P4)/4
-        all_avg.append(sub_avg)
-    return all_avg
+#def LoadAll_fft_baseline():
+##FFT's from tura 3 i 2 were not combined, only the mean freqs were
+#    electrode = '/F3_'
+#    path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/Baseline_ffts/'
+#    files =  [file for file in glob.glob(path +'*') if electrode in file]
+#    #Get only unique name of a subject
+#    unique = list(set(names))
+#    _all = []
+#    for file in files:
+#        #squeeze removes the first dimension, because it's actually a 2d array mean_freq x week, but is stored in a 1 x fre x week format. 1 is removed
+#        _all.append(sio.loadmat(file)['res_all'])
+#    return files,  _all
 
 
 
 
-def Z_score(vector):
-#Sanity check, should be a numpy array anyways. If not np, then subtraction might not subtract a constant from all elements
-    copy = vector
-    nan_idx = np.isnan(vector)
-    #Compute zscore for non nans
-    vector = vector[~nan_idx]
-    z_score = (vector - np.mean(vector))/np.std(vector)
-    #Substitute non nans with z score and keep the remaining nans
-    copy[~nan_idx] = z_score
-    return copy
 
-def truncate(f, n):
-    '''Truncates/pads a float f to n decimal places without rounding'''
-    s = '{}'.format(f)
-    if 'e' in s or 'E' in s:
-        return '{0:.{1}f}'.format(f, n)
-    i, p, d = s.partition('.')
-    return '.'.join([i, (d+'0'*n)[:n]])
+
+
