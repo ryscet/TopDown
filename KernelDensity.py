@@ -91,7 +91,7 @@ def GeneralModel(_initial, followUp, band, conditions, conditions_str):
     kernel.plot(x,dist_func(x), 'b')
 
     kernel.hist(initial, normed  =True, color = 'lightBlue')
-    kernel.set_xlabel('Kernel density')
+    kernel.set_xlabel('Distribution')
     #Calc and plot derivative, just for visualsation
     slope = []
     for i in x:
@@ -115,6 +115,7 @@ def GeneralModel(_initial, followUp, band, conditions, conditions_str):
     model.legend(loc = 'best')
     model.set_xlabel('initial value')
     model.set_ylabel('change value')
+    #model.set_yticklabels(model.get_yticklabels()[::-1])
 
     fig.savefig(path +band+'.png', dpi = 400)
 
@@ -220,6 +221,34 @@ def PlotKernel(band = 'alpha'):
     ax.plot(x, my_pdf(x) *400,'r') # distribution function
       #  kernels.append(kernels)
        # hist(samp,normed=1,alpha=.3) # histogram
+
+def AnalyzeAllElectrodes():
+    """From Jacek """
+    path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/wszystkie_elektrody_jacek.csv'
+    db = pd.read_csv(path)
+
+    for band in ['theta', 'alpha','smr', 'beta1', 'beta2']:
+        db[band+'_po'] = db[band+ '_przed'] + db[band+'_roznica']
+    #    fig = plt.figure()
+     #   fig.suptitle(band)
+      #  corr = fig.add_subplot(211)
+      #  diff = fig.add_subplot(212)
+
+        sns.jointplot(band +'_przed', band+'_po', data=db, kind="reg")#, color="r", size=7)
+
+      #  fig = plt.figure()
+       # fig.suptitle(band)
+
+        sns.jointplot(band +'_przed', band+'_roznica', data=db, kind="reg")#, color="r", size=7)
+        conditions_str = ['mixed_conditions' for i in range(0,len(db))]
+        conditions = [0 for i in range(0,len(db))]
+        GeneralModel( db[band+ '_przed'] ,  db[band+ '_po'] , band, conditions, conditions_str)
+        #corr.scatter(db[band +'_przed'], db[band+'_po'])
+        #diff.scatter(db[band +'_przed'], db[band+'_roznica'])
+
+    return db
+
+
 
 
 

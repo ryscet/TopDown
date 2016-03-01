@@ -55,11 +55,12 @@ def CorrelateTrainingBaseline():
 def RunAllGrouped():
     bands = ['all_spectrum', 'alpha', 'beta1', 'beta2', 'smr','ratio', 'theta', 'trained', 'ratio']
     for band in bands:
-        GroupedDistributionsPlot(band)
+        #GroupedDistributionsPlot(band)
+        GroupbyProtocolDistributionsPlot(band)
 
 
 
-def GroupedDistributionsPlot(band):
+def AllTogetherDistributionsPlot(band):
     path = '/Users/ryszardcetnarski/Desktop/GroupedDistributions/'
     plt.style.use('seaborn-bright')
     db = LoadDatabase()
@@ -212,6 +213,121 @@ def IndivisualDistributionsPlot():
        #rest.loc[name]['Before'].loc['alpha'])
        # return rest.loc[name]['Before'].loc['alpha']
     plt.tight_layout()
+
+
+
+def GroupbyProtocolDistributionsPlot(band):
+    path = '/Users/ryszardcetnarski/Desktop/GroupedDistributions/'
+    plt.style.use('seaborn-bright')
+    db = LoadDatabase()
+    rest = prep.Load_rest()
+    kde_bandwith = 0.8
+
+    #dist_func = gaussian_kde(initial, )
+
+
+
+
+    plot_lims = {'all_spectrum': (-60,60), 'alpha': (-30,30), 'beta1': (-40,40), 'beta2': (-40,40),
+    'beta3':(-40,40), 'smr':(-15,15),'ratio': (-1.2,1.2), 'theta':(-20,20), 'trained':(-15,15) }
+  #  i is just for labels not to duplicate
+    i = 0
+    db['condition'] = db['condition'].str.replace('plus', 'mixed')
+    db['condition'] = db['condition'].str.replace('minus', 'mixed')
+
+    fig = plt.figure()
+    gi = 1
+    for group_name, condition_group in db.groupby('condition'):
+          #axes for plotting
+        #ax = [fig.add_subplot(220+idx+1) for idx, band in enumerate(bands)]
+        ax = fig.add_subplot(120+gi)
+        all_training = []
+        all_baseline = []
+
+        all_rest_after = []
+        rest_diffs = []
+        gi = gi+1
+        for name, subject in condition_group.groupby(condition_group.index):
+            if name in rest:
+
+                #Name is subject, .mean() is taken from the four training electrodes
+
+                rest_before = rest[name]['Before'].loc[band].mean()
+                #Rest after relative to rest before
+                rest_after = rest[name]['After'].loc[band].mean() - rest_before
+                training = ExtractBands(subject, 'training', band)
+                all_training.extend(training - rest_before )
+
+                baseline = ExtractBands(subject.dropna(subset = ['baseline_bands']), 'baseline', band)
+                all_baseline.extend(baseline - rest_before)
+
+                training_distribution = gaussian_kde(training - rest_before, kde_bandwith)
+                baseline_distribution = gaussian_kde(baseline - rest_before, kde_bandwith)
+
+
+
+                ax.axvline(rest_after, color = 'black',alpha = 0.2, linestyle = 'dashed', linewidth = 2, label = 'rest po' if i == 0 else "")
+
+                all_rest_after.append(rest[name]['After'].loc[band].mean() - rest_before)
+
+                #Code wzrosty i spadki
+                if(rest_after < 0):
+                    rest_diffs.append(-1)
+                else:
+                    rest_diffs.append(1)
+
+               # ax.set_xlim(-50, 50)
+               # ax.set_ylim(0, 0.2)
+                xmin, xmax = plot_lims[band]
+                #xmin, xmax = ax.get_xlim()
+                x = np.linspace(xmin, xmax, 1000)
+    #
+                ax.plot(x , training_distribution(x), color = 'blue', alpha = 0.3, label ='dystrybucja trening'  if i == 0 else "")
+                ax.plot(x , baseline_distribution(x), color = 'green',alpha = 0.3, label ='dystrybucja baseline'  if i == 0 else "")
+
+                ax.set_title(group_name + ' ' +band)
+                #Iterator only used for labels
+                i = i +1
+                 #Dirty hack
+                if(band == 'alpha'):
+                    ax.set_ylim(0,1)
+
+    #            if(idx == 3):
+    #                ax[idx].legend(loc = 'best')
+    #            print(xmin)
+    #            #return
+
+               # fig.savefig(path + name +'.png', dpi = 400)
+
+                #break
+               #rest.loc[name]['Before'].loc['alpha'])
+               # return rest.loc[name]['Before'].loc['alpha']
+            else:
+                print('Not in rest: '+name)
+        ax.axvline(0, color = 'red', linestyle = 'dashed', linewidth = 3,alpha = 0.9, label = 'rest przed')
+
+        n_spadki = len([i for i in rest_diffs if i <0])
+        n_wzrosty = len([i for i in rest_diffs if i >0])
+        ax.annotate( 'wzrosty: '  +str(n_wzrosty) +' spadki: '+str(n_spadki) , xy =(xmin, 0.05))
+
+        all_training = np.array(all_training)
+        all_baseline = np.array(all_baseline)
+
+        train_group_ditribution = gaussian_kde(all_training, kde_bandwith)
+        base_group_ditribution = gaussian_kde(all_baseline, kde_bandwith)
+
+        ax.plot(x , train_group_ditribution(x) *5, color = 'blue', alpha = 0.8)
+       # ax.plot(x , base_group_ditribution(x) *5, color = 'green', alpha = 0.8)
+
+        ax.axvline(np.array(all_rest_after).mean(), color = 'black', linestyle = 'dashed', linewidth = 2,alpha = 0.5)
+
+        ax.set_xlim(plot_lims[band])
+
+        ax.legend()
+
+        plt.tight_layout()
+        ax.grid(b=False)
+      #  fig.savefig(path+ '_' + band +'.png', dpi =300)
 
 
 def LoadDatabase():

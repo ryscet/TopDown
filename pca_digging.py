@@ -25,9 +25,10 @@ def MakeBlocksArray(band):
     all_normed = []
     for name, subject in db.groupby(db.index):
         blocks = ExtractBlocks(subject, 'training', band)
-        blocks_normed =( zscore(blocks, axis = None).T -  zscore(blocks, axis = None)[:,0][:, np.newaxis].T).T
+       # return blocks
+        #blocks_normed =( zscore(blocks, axis = None).T -  zscore(blocks, axis = None)[:,0][:, np.newaxis].T).T
+        blocks_normed = zscore(blocks, axis = None)
         all_normed.append(pd.DataFrame(blocks_normed, index= subject.index))
-
     all_normed = pd.concat(all_normed)
     all_normed['condition'] = db['condition']
 
@@ -36,7 +37,6 @@ def MakeBlocksArray(band):
                   'control':2,
                   'sham':3}
     color = ['r', 'b','grey','g']
-
 
 
 
@@ -63,7 +63,7 @@ def MakeBlocksArray(band):
     legend.legendHandles[1].set_color('blue')
     legend.legendHandles[2].set_color('green')
 
-    fig.savefig(path +'minus_first_pca_'+band+'.png')
+    #fig.savefig(path +'session_avg_pca_'+band+'.png')
 
   #  return all_normed
 
