@@ -13,49 +13,79 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import scipy.stats as stats
+import matplotlib
 
 
+def TryStyles():
+    sesje = LoadSesje()
+    for style in plt.style.available:
+        print(style)
+        Plot(sesje, 'session', style)
 
-
-
-def PlotSesje():
+def Plot(data, xlabel):
     plt.close('all')
     #Beta1 15 -22, #Beta2 22-50
-    all_sesje = LoadSesje()
-    plt.style.use('grayscale')
+    plt.style.use('classic')
 
-    for band, sesje in  all_sesje.items():
-        mydict = {'beta1': 'Beta (15-22 Hz)', 'beta2': 'Beta (22-45 Hz)', 'alpha': 'Alpha (8-12 Hz)'}
-        fig = plt.figure()
-        fig.suptitle(mydict[band], fontsize = 18)
-        ax = fig.add_subplot(111)
+    fig = plt.figure(figsize = (45,8))
+    #fig.suptitle(mydict[band] , fontsize = 28)
+    i = 1
 
-        groups_dict = {1:('NMB+', 'orange'), 2:('CTR', 'blue'), 3:('MB+', 'red')}
+    path ='/Users/ryszardcetnarski/Desktop/Wykresy/'
+    for band, sesje in  sorted(data.items()):
+        mydict = {'beta1': 'Beta (15-22 Hz)', 'beta2': 'Beta2 (22-45 Hz)', 'alpha': 'Alpha (8-12 Hz)'}
+        #ax = fig.add_subplot(111)
+
+        groups_dict = {1:('NMB+', 'red','-'), 2:('CON', 'blue','-'), 3:('MB+', 'red','--')}
+        ax = fig.add_subplot(130+i)
+        ax.set_title(mydict[band] , fontsize = 28)
+        i = i+1
         for idx, group in sesje.groupby('grupa', as_index = True):
+            x = np.linspace(1, len(group.columns)-1, len(group.columns)-1) #x axis
             mean = group.drop('grupa',1).as_matrix().mean(axis = 0)
             sem = stats.sem(group.drop('grupa',1).as_matrix())
-           # print(sem)
-            ax.plot(np.linspace(1, 8, 8),mean, color = groups_dict[idx][1], label = groups_dict[idx][0], linewidth = 3)
-           # ax.fill_between(np.linspace(1, 8, 8), mean - sem, mean + sem, color = groups_dict[idx][1], alpha = 0.2)
-            ax.errorbar(np.linspace(1, 8, 8), mean, yerr=sem, fmt='o', color = groups_dict[idx][1], markeredgecolor = groups_dict[idx][1] )
-        ax.set_xlabel('session')
-        ax.set_ylabel('amplitude (z scored)')
 
+            ax.plot(x,mean, color = groups_dict[idx][1], label = groups_dict[idx][0], linewidth = 3, linestyle = groups_dict[idx][2] )
+           # ax.fill_between(np.linspace(1, 8, 8), mean - sem, mean + sem, color = groups_dict[idx][1], alpha = 0.2)
+            ax.errorbar(x, mean, yerr=sem, fmt='o', color = groups_dict[idx][1], markeredgecolor = groups_dict[idx][1] )
+
+        ax.spines['top'].set_color('none')
+        ax.spines['right'].set_color('none')
+
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+
+        ax.set_ylabel('')
+        ax.xaxis.set_ticks(x)
        # ax.set_xticks()
 
         ax.set_ylim(-1,2.5)
-        ax.set_xlim(0.85,8.15)
+        ax.set_xlim(0.85,len(group.columns) -1 +0.15)
+
+        for xtick in ax.xaxis.get_major_ticks():
+            xtick.label.set_fontsize(22)
+
+        for ytick in ax.yaxis.get_major_ticks():
+            ytick.label.set_fontsize(22)
 
 
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles[::-1],labels[::-1], loc = 'best')
+        if(band == 'beta2'):
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend([handles[2], handles[0], handles[1] ],[labels[2], labels[0], labels[1] ], loc = 'upper right', bbox_to_anchor=(1.35, 1))
+            ax.yaxis.set_ticks([])
+
+        if(band == 'alpha'):
+            ax.set_ylabel('amplitude (z-scored)', fontsize =24)
 
 
+        if(band == 'beta1'):
+            ax.yaxis.set_ticks([])
+            ax.set_xlabel(xlabel, fontsize =24)
+        print(matplotlib.rcParams['font.family'])
 
-            #sns.tsplot(data=group.as_matrix(), err_style = 95,ax= ax)
-            #return group.drop('grupa',1)
-        #return pd.melt(sesje, 'grupa')
-
+        #fig.tight_layout()
+    fig.savefig(path + '' +xlabel +'.png')
+    fig.savefig(path + '' +xlabel +'.eps')
 
 
 def LoadSesje():

@@ -22,82 +22,30 @@ import glob
 import scipy.io as sio
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
-def PCA(X, labels):
-
-    sklearn_pca = sklearnPCA(n_components=2)
-    Y_sklearn = sklearn_pca.fit_transform(X)
-
-    fig = plt.figure()
-   # fig.suptitle(band, fontweight = 'bold')
-    ax1 = fig.add_subplot(211)
-    ax2 = fig.add_subplot(212)
-
-    km = KMeans(n_clusters=2)
-    km.fit(Y_sklearn)
+#TODO maybe add a condition that only blocks with a lower mean from the groupo mean can be filtered out
+#Then also add manually marking artifacts because for fuck sake there is more of them then inliers- so maybe treat the good ones as outliers
+def Run():
+    labels = FilterIndividualAndGroup()
+    MarkBadOnes(labels[labels['mask'] ==1])
 
 
-   #ax.scatter(Y_sklearn[:,0], Y_sklearn[:,1])
-
-    #tresh = [0 if i >4 else 1 for i  in Y_sklearn[:,0]]
-    colors = ['blue', 'red']
-    for idx, row in enumerate(Y_sklearn):
-        ax2.scatter(row[0], row[1], color =colors[km.labels_[idx]], alpha = 0.5)
-        ax1.plot(X[idx,:], color = colors[km.labels_[idx]], alpha = 0.2)
-
-    labels.iloc[km.labels_ ==1].to_csv('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/miesniowcy_pca.csv ')
-    return km.labels_, labels.iloc[km.labels_ ==1]
+def MarkBadOnes(bad_ones):
+    """bad ones is a data frame with a column alltogehter wich contains strings made from name+block+subject
+    which represent blocks where pca picked them as outliers. First run Individual pca filter which makes a dataase
+    of all subjects session and blocks and a column which discriminates inliers and outliers pd(columns = [subject, session, block, alltogether, mask])
+    call like MarkBadOnes(labels[labels['mask'] ==1])"""
 
 
-
-
-
-
-
-
-
-def PlotMeans():
-    allFFT, freqs = Load_FFT()
-
-    for name, fft in allFFT.items():
-        fig= plt.figure()
-        fig.suptitle(name, fontweight = 'bold')
-        ax = fig.add_subplot(111)
-        for session in range(0, fft.shape[0]):
-            #return fft[session,:,:]
-           # for block in range(0,fft.shape[2]):
-            single_session =fft[session,:,:]
-            if(np.count_nonzero(~np.isnan(single_session)) > 1):
-
-                #single_fft = np.mean(fft[session,:,block][~np.isnan(fft[session,:,block])], axis = 2)
-                mean_fft = np.mean(single_session, axis = 1)[:, np.newaxis]
-                ax.plot(freqs,mean_fft, alpha = 0.1)
-                #return mean_fft, freqs
-
-def PlotMothafuckingAll(bad_ones = None):
-    #Dirty hack, because during the first run of pca resultsfor filtering are
-    #not knownthis function also creates the bad ones, so after first run it can be fed back to it
-    if(bad_ones == None):
-        bad_ones = pd.DataFrame(data=['0'],columns = ['alltogether'])
-    allFFT, freqs = Load_FFT()
-#    fig= plt.figure()
-#    all_fft_pca = []
-#  #  fig.suptitle(name, fontweight = 'bold')
-#    ax = fig.add_subplot(111)
-    labels = pd.DataFrame(columns = ('subject', 'session', 'block', 'alltogether'))
-    i = 0
-
-    all_fft_pca = []
-
+    allFFT, freqs = Load_FFT(2,50)
     for name, fft in allFFT.items():
         fig= plt.figure()
         fig.suptitle(name, fontweight = 'bold')
         ax = fig.add_subplot(111)
 
-
+        print('plotting %s' %name)
         for session in range(0, fft.shape[0]):
-            #return fft[session,:,:]
+
             for block in range(0,fft.shape[2]):
 
                 single_fft = fft[session,:,block][~np.isnan(fft[session,:,block])]
@@ -105,24 +53,20 @@ def PlotMothafuckingAll(bad_ones = None):
                     color = 'blue'
                     if(bad_ones['alltogether'].str.contains(name +str(session)+str(block)).any()):
                         color = 'red'
-                    ax.plot(freqs,np.log(single_fft), alpha = 0.5, color = color)
-                    all_fft_pca.append(np.log(single_fft))
-
-                    labels.loc[i] = [name,session, block, name+str(session)+str(block)]
-                    i = i+1
-
-    return np.array(all_fft_pca), labels
+                    ax.plot(freqs, np.log(single_fft), alpha = 0.5, color = color, alpha = 0.2)
 
 
-def IndividualPcaFilter():
-    """This function returns only non nan blocks in a very long list of all blocks.
-    Secondly it returns a very long dataframe which describe each index of the fft list with subject, session, block info,
-    also stating if it was identified as an outlier block using pca+malahanobis (mask column in labels)"""
+
+def FilterIndividualAndGroup():
+    """This function returns all blocks annotated as inliers or outliers.
+    First it runs PCA on blocks grouped by individuals and identifies outliers based on malahanobis distance
+    of each block 1st and 2nd component.
+    Then it runs pca on all blocks combined and clusters them into 2 clusters, filtering out the smaller one"""
 
     #Structure for keeping the information about in/outliers (miesniowcy)
     labels = pd.DataFrame(data = [[None, None,None, None, None]],columns = ('subject', 'session', 'block', 'alltogether', 'mask'))
     #loads a  dict of subjects, each subject is a list of arrays, each array are blocks*session ( Session, signalIdx, block)
-    allFFT, freqs = Load_FFT()
+    allFFT, freqs = Load_FFT(15, 40)
     #Indexer just for labels df
     df_idx = 0
     all_labels = []
@@ -149,40 +93,41 @@ def IndividualPcaFilter():
         else:
             all_fft = np.array(subject_fft)
     all_labels = np.array(all_labels)
-
-    print('N outliers inside individual: %f' %sum(all_labels))
+    print('N outliers inside individual: %i' %sum(all_labels))
 
         #Put pca results in info
 #Do the second PCA filtering outliers on individual level
     print('all blocks: %d' %len(all_fft))
-    filtered = all_fft[np.where(all_labels == 0 )[0],:]
+    filtered = all_fft[np.where(all_labels == 0)[0],:]
     print('filtered: %d' %len(filtered))
 
     grouped_labels = PcaFilter(filtered, 'all subjects',True, 'cluster')
-    print('N outliers across group: %f' %sum(grouped_labels))
+    print('N outliers across group: %i' %sum(grouped_labels))
 
     #Combine the score from individual and group filtering
-    all_labels[np.where(all_labels == 0 )[0]] = all_labels[np.where(all_labels == 0 )[0]] + grouped_labels
+    all_labels[np.where(all_labels == 0)[0]] = all_labels[np.where(all_labels == 0)[0]] + grouped_labels
     labels['mask']= all_labels
 
-    return labels#, all_fft
+    return labels
 
 
 def PcaFilter(X, name, PLOT_ON, method):
-    print('Inside PCA filter')
     """Individual subjects have outlier blocks filtered out based on malahanobis distance of their pca 1st and 2nd component
     (each subject is projected into their own variance space).
     Returns mask array (of 0's and 1's lenght of X) indicing bad and good blocks"""
+    #The convention for mask arrays is 0 - inlier, 1 - outlier
+
     #Pca decomposition into first two components
     sklearn_pca = sklearnPCA(n_components=2)
     pcs = sklearn_pca.fit_transform(X)
 
+
     if(method == 'outlier'):
         #This index corresponds to the original index on the array of time series
-        outlier_idx = MD_removeOutliers(pcs[:,0], pcs[:,1])
+        #last argument is the threshold of how many standard deviations away a point is considered an outlier
+        outlier_idx = MD_removeOutliers(pcs[:,0], pcs[:,1], 2)
         #this will be used for a boolean array for filtering.
         mask_array = np.zeros(len(pcs))
-#The convention for mask arrays is 0 - inlier, 1 - outlier
         if(len(outlier_idx) >0 ):
             mask_array[outlier_idx] = 1
 
@@ -210,9 +155,10 @@ def PcaFilter(X, name, PLOT_ON, method):
 
 
 
-def MD_removeOutliers(x, y):
+def MD_removeOutliers(x, y, std):
+    #Std - how many standard deviations avay from the mean to exclude
     MD = MahalanobisDist(x, y)
-    threshold = np.mean(MD)+np.std(MD)*3 # adjust 1.5 accordingly
+    threshold = np.mean(MD)+np.std(MD)*std # adjust 1.5 accordingly
     nx, ny, outliers = [], [], []
     for i in range(len(MD)):
         if MD[i] <= threshold:
@@ -236,28 +182,14 @@ def MahalanobisDist(x, y):
         md.append(np.sqrt(np.dot(np.dot(np.transpose(diff_xy[i]),inv_covariance_xy),diff_xy[i])))
     return md
 
-   # fig = plt.figure()
-   # fig.suptitle(band, fontweight = 'bold')
-   # ax1 = fig.add_subplot(111)
-    #ax2 = fig.add_subplot(312)
-    #ax3 = fig.add_subplot(313)
 
-
-
-   # ax1.scatter(Y_sklearn[:,0], Y_sklearn[:,1], alpha = 0.5)
-  #  ax = sns.kdeplot(Y_sklearn[:,0], Y_sklearn[:,1], ax = ax1)
-
-#g = (sns.jointplot("sepal_length", "sepal_width", data=iris, color="k").plot_joint(sns.kdeplot, zorder=0, n_levels=6))
-   # g = (sns.jointplot(Y_sklearn[:,0], Y_sklearn[:,1], kind="kde", stat_func=None,).set_axis_labels("x", "y"))
-   # g = (sns.jointplot(Y_sklearn[:,0], Y_sklearn[:,1]).plot_joint(sns.kdeplot, zorder=0, n_levels=6))
-    ###############################################################################
-
-
-    # Initialize the clusterer with n_clusters value and a random generator
-    # seed of 10 for reproducibility.
 
 def Cluster(X):
     range_n_clusters = [2]
+    # Initialize the clusterer with n_clusters value and a random generator
+    # seed of 10 for reproducibility.
+    clusterer = KMeans(n_clusters=2, random_state=10)
+    cluster_labels = clusterer.fit_predict(X)
 
     for n_clusters in range_n_clusters:
         # Create a subplot with 1 row and 2 columns
@@ -271,10 +203,7 @@ def Cluster(X):
         # plots of individual clusters, to demarcate them clearly.
         ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
 
-        # Initialize the clusterer with n_clusters value and a random generator
-        # seed of 10 for reproducibility.
-        clusterer = KMeans(n_clusters=n_clusters, random_state=10)
-        cluster_labels = clusterer.fit_predict(X)
+
 
         # The silhouette_score gives the average value for all the samples.
         # This gives a perspective into the density and separation of the formed
@@ -342,36 +271,25 @@ def Cluster(X):
                      fontsize=14, fontweight='bold')
 
         plt.show()
-        return cluster_labels.astype(int)
-        # Display results
 
-    # Show data set
-
-
-#    #tresh = [0 if i >4 else 1 for i  in Y_sklearn[:,0]]
-#    colors = ['blue', 'red']
-#    for idx, row in enumerate(Y_sklearn):
-#        ax2.scatter(row[0], row[1], color =colors[km.labels_[idx]], alpha = 0.5)
-#        ax1.plot(X[idx,:], color = colors[km.labels_[idx]], alpha = 0.2)
-#
-#    #labels.iloc[km.labels_ ==1].to_csv('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/miesniowcy_pca.csv ')
-#
-#    return km.labels_, labels.iloc[km.labels_ ==1]
+        #Clusters will switch labels depending on random initialization
+        #If there are mostly ones - i.e. inliers are marked as 1, reverse
+    if(np.count_nonzero(cluster_labels.astype(int)) > len(cluster_labels.astype(int))/2 ):
+        #reverse 0's and 1's
+        mask_array = np.zeros(len(cluster_labels.astype(int))) + 1 - cluster_labels.astype(int)
+    else:
+        mask_array = cluster_labels.astype(int)
 
 
+    return mask_array
 
 
-
-
-
-def Load_FFT():
+def Load_FFT(min_freq,max_freq ):
     '''train_base_rest = train | base | rest'''
 #TODO check whats up with the overlapping subjects from tura 2 and 3, repeat when normalization amplitude methds are finally decided (divide by sum/mean, take sum/mean)
     path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/fft_treningi/'
 
-#Divide by 2 to get the actual frequency in Hz (more or less, +-1)
-    min_freg = 25
-    max_freq = 65
+
     #Select only file names without proc suffix (procenty) and removing the electrode and Abs_amp prefix
     names = [os.path.basename(x)[11:-4] for x in glob.glob(path+'*') if 'P4' in x]
     #Need to filter for proc again, to pass it for later subject selection, otherwise names uniques will include procs
@@ -390,9 +308,13 @@ def Load_FFT():
             all_electrodes.append(sio.loadmat(file)['spectra'].swapaxes(0,2).swapaxes(1,2))
             #Load freqs only once
             if('freqs' not in locals()):
-                freqs = sio.loadmat(file)['freqs'][min_freg:max_freq]
-            all_subjects[subject] = AverageElectrodes(all_electrodes)[:,min_freg:max_freq,:]#only take the first 30 hz
-            #all_subjects[subject] = all_electrodes[0][:,0:30,:]#only take the first 30 hz
+                #Get the indexes where the frequencies are in bound of those of interest. Index does not eqal frequency
+                freqs = sio.loadmat(file)['freqs']
+                min_idx = np.where(freqs> min_freq)[0][0]
+                max_idx = np.where(freqs> max_freq)[0][0]
+                freqs = freqs[min_idx:max_idx]
+            all_subjects[subject] = AverageElectrodes(all_electrodes)[:,min_idx:max_idx,:]#only take the first 30 hz
+
     return all_subjects, freqs
 
 
@@ -409,34 +331,4 @@ def AverageElectrodes(all_electrodes):
     return avg
 
 
-#
-#
-#    #km = KMeans(n_clusters=2)
-#    #km.fit(Y_sklearn)
-## generate the linkage matrix
-#    Z = linkage(Y_sklearn , 'ward')
-#    # calculate full dendrogram
-#
-#    ax2.set_title('Hierarchical Clustering Dendrogram')
-#    ax2.set_xlabel('sample index')
-#    ax2.set_ylabel('distance')
-#    ax1.set_title( str(sklearn_pca.explained_variance_ratio_))
-#    dendrogram(
-#        Z,
-#        truncate_mode='lastp',  # show only the last p merged clusters
-#        p=12,  # show only the last p merged clusters
-#        leaf_rotation=90.,
-#        leaf_font_size=12.,
-#        show_contracted=True,
-#        ax = ax2# to get a distribution impression in truncated branches
-#    )
-#
-#    k=3
-#   clusters = fcluster(Z, k, criterion='maxclust')
-# #   clusters=fcluster(Z, 8, depth=12)
-#
-#
-#    ax1.scatter(Y_sklearn[:,0], Y_sklearn[:,1], c=clusters, cmap='jet')
-#    color = ['','r','b','g']
-#    for idx,row in enumerate(X):
-#        ax3.plot(row, c = color[clusters[idx]], alpha =0.2)
+
