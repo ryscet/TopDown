@@ -1,11 +1,18 @@
 
+addpath('/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/eeglab')
 eeglab
-path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Data';
-output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/signals/';
-second_output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/events/';
+
+path = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/sygnal_rest/eeglab_format';
+%path = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Data';
+output = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/sygnal_rest/mat_format/';
+%output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/signals/';
+second_output = '/Users/ryszardcetnarski/Desktop/Nencki/Badanie_NFB/Dane/sygnal_rest/events/';
+%second_output = '/Users/ryszardcetnarski/Desktop/Nencki/TD/Converted_Data/events/';
+
+
 files = dir(path);
 %Find all the files with .set type FROM THE FIRST ROUND (before training)
-index = find(~cellfun(@isempty,strfind({files.name},'2_TD.set')));
+index = find(~cellfun(@isempty,strfind({files.name},'.set')));
 files = {files.name};
 %Sort them alphabetically
 files = sort(files(index));

@@ -45,6 +45,7 @@ def MakeBlocksArray(band):
     y = all_normed.ix[:,10].values
     X_std = StandardScaler().fit_transform(X)
 
+
     sklearn_pca = sklearnPCA(n_components=2)
     Y_sklearn = sklearn_pca.fit_transform(X)
 
