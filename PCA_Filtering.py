@@ -392,7 +392,7 @@ def Load_FFT():
             if('freqs' not in locals()):
                 freqs = sio.loadmat(file)['freqs'][min_freg:max_freq]
             all_subjects[subject] = AverageElectrodes(all_electrodes)[:,min_freg:max_freq,:]#only take the first 30 hz
-            #all_subjects[subject] = all_electrodes[0][:,0:30,:]#only take the first 30 hz
+            #all_subjects[subject] = all_electrodes#[0][:,0:30,:]#only take the first 30 hz
     return all_subjects, freqs
 
 

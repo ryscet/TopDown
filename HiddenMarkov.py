@@ -27,10 +27,10 @@ import pandas as pd
 #Then also add manually marking artifacts because for fuck sake there is more of them then inliers- so maybe treat the good ones as outliers
 def Run():
     labels = FilterIndividualAndGroup()
-    MarkBadOnes(labels[labels['mask'] ==1])
+    MarkOutliers(labels[labels['mask'] ==1])
 
 
-def MarkBadOnes(bad_ones):
+def MarkOutliers(bad_ones):
     """bad ones is a data frame with a column alltogehter wich contains strings made from name+block+subject
     which represent blocks where pca picked them as outliers. First run Individual pca filter which makes a dataase
     of all subjects session and blocks and a column which discriminates inliers and outliers pd(columns = [subject, session, block, alltogether, mask])
@@ -53,7 +53,7 @@ def MarkBadOnes(bad_ones):
                     color = 'blue'
                     if(bad_ones['alltogether'].str.contains(name +str(session)+str(block)).any()):
                         color = 'red'
-                    ax.plot(freqs, np.log(single_fft), alpha = 0.5, color = color, alpha = 0.2)
+                    ax.plot(freqs, np.log(single_fft),  color = color, alpha = 0.2)
 
 
 
@@ -86,23 +86,23 @@ def FilterIndividualAndGroup():
                     subject_fft.append(np.log(np.array(single_fft)))
         #Perform pca based on all blocks from subject to filter out outliers
         all_labels.extend( PcaFilter(np.array(subject_fft), name, False, 'outlier'))
-        print(np.array(subject_fft).shape)
+        #print(np.array(subject_fft).shape)
         if('all_fft' in locals()):
             all_fft = np.vstack((all_fft, subject_fft))
 
         else:
             all_fft = np.array(subject_fft)
     all_labels = np.array(all_labels)
-    print('N outliers inside individual: %i' %sum(all_labels))
+    #print('N outliers inside individual: %i' %sum(all_labels))
 
         #Put pca results in info
 #Do the second PCA filtering outliers on individual level
-    print('all blocks: %d' %len(all_fft))
+    #print('all blocks: %d' %len(all_fft))
     filtered = all_fft[np.where(all_labels == 0)[0],:]
-    print('filtered: %d' %len(filtered))
+    #print('filtered: %d' %len(filtered))
 
     grouped_labels = PcaFilter(filtered, 'all subjects',True, 'cluster')
-    print('N outliers across group: %i' %sum(grouped_labels))
+   # print('N outliers across group: %i' %sum(grouped_labels))
 
     #Combine the score from individual and group filtering
     all_labels[np.where(all_labels == 0)[0]] = all_labels[np.where(all_labels == 0)[0]] + grouped_labels
